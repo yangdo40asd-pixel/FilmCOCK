@@ -1,21 +1,21 @@
-import 'package:filmcock_app/presentation/screens/mbti_select_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-// 1. 방금 설치한 패키지를 import
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:filmcock_app/firebase_options.dart';
+import 'package:filmcock_app/presentation/screens/splash/splash_screen.dart';
 
-// 2. main 함수를 async로 변경
 void main() async {
-  // 3. Flutter 앱이 실행되기 전에 네이티브 코드를 초기화하도록 보장
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 파이어베이스 초기화
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // 4. 기기 저장소에서 SharedPreferences 인스턴스를 가져옴 (비동기)
   final prefs = await SharedPreferences.getInstance();
-
-  // 5. 'user_mbti'라는 키로 저장된 값이 있는지 확인
   final String? savedMbti = prefs.getString('user_mbti');
 
-  // 6. runApp을 실행할 때, 저장된 MBTI 값을 전달
   runApp(MyApp(savedMbti: savedMbti));
 }
 
@@ -54,8 +54,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      // --- 수정된 부분: 프로토타입을 위해 항상 온보딩 화면으로 시작 ---
-      home: const MbtiSelectScreen(),
+      // 스플래시 화면으로 첫 시작 변경
+      home: SplashScreen(savedMbti: savedMbti),
       debugShowCheckedModeBanner: false,
     );
   }

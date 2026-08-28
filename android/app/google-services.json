@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "791108439820",
+    "project_id": "filmcock-99086",
+    "storage_bucket": "filmcock-99086.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:791108439820:android:73242e537278c94c6e0329",
+        "android_client_info": {
+          "package_name": "com.example.filmcock_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "791108439820-f488k716i3gbpfiqarecmbcvp14hidqm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.filmcock_app",
+            "certificate_hash": "b0fac4f3c92e0e86ed104d7a91c436f4f25e1c92"
+          }
+        },
+        {
+          "client_id": "791108439820-4iu11v30ej202nn62qq1mnm27fd6bdoq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBN2n3ete2M8v0k-_CAcTMtz4lCiDSUPZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "791108439820-4iu11v30ej202nn62qq1mnm27fd6bdoq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
