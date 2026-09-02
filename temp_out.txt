@@ -1,0 +1,21 @@
+ntext, movies: movies),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 4. 방영 예정일 영화 📅
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '방영 예정일 영화',
+                emoji: '📅',
+                onTap: () {},
+              ),
+            ),
+            const SizedBox(height: 1
+---
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:filmcock_app/data/services/api_service.dart';
+import 'package:filmcock_app/presentation/widgets/section_header.dart';
+import 'package:filmcock_app/presentation/screens/home/list_view_screen.dart';
+import 'package:filmcock_a

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:filmcock_app/data/models/mbti_info.dart';
+import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
 import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
-
 import 'package:filmcock_app/presentation/screens/onboarding/mbti_panel_screen.dart';
 
+// ============================================================
+// MBTI 시작 화면 (안내 팝업 + 흔백 배경)
+// ============================================================
 class MbtiSelectScreen extends StatefulWidget {
   const MbtiSelectScreen({super.key});
 
@@ -11,20 +15,97 @@ class MbtiSelectScreen extends StatefulWidget {
 }
 
 class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
-  bool _showPopup = true; // 처음에는 상태창(팝업)이 보이도록 설정
+  bool _showPopup = true;
+
+  // [건너뛰기] 버튼: 안내 팝업 먼저
+  void _onSkip() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: const Color(0xFF1E1E2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '건너뛰시겠습니까?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '(선호장르 화면으로 넘어갑니다)',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.white70,
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const GenreSelectScreen(
+                            mbtiInfo: MbtiInfo(id: 'NONE', title: '건너뛰기', description: '', feature: '', recommendedGenres: '', genreIds: [], famousPeople: [], svgAsset: ''),
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text(
+                      '예',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text(
+                      '아니요',
+                      style: TextStyle(color: Colors.white54, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // 상태창이 지워졌을 때의 기본 흰 바탕
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // 1. 기본 배경 화면 (흰 바탕, 로고, 하단 버튼들)
           SafeArea(
             child: Column(
               children: [
-                const SizedBox(height: 120), // 상단 여백
-                // MBTI 로고 이미지
+                const SizedBox(height: 120),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Image.asset(
@@ -33,26 +114,22 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                   ),
                 ),
                 const Spacer(),
-                // 하단 버튼 영역
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   child: Column(
                     children: [
-                      // 선택하기 버튼
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                            // 다크테마 MBTI 패널 화면으로 이동
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => MbtiPanelScreen(),
-                              ),
+                                  builder: (_) => MbtiPanelScreen()),
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF32285E), // 진한 보라(남색) 배경
+                            backgroundColor: const Color(0xFF32285E),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -68,16 +145,8 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // 건너뛰기 버튼
                       TextButton(
-                        onPressed: () {
-                          // 건너뛰기 클릭 시 홈 화면(MainScreen)으로 이동
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => const MainScreen(),
-                            ),
-                          );
-                        },
+                        onPressed: _onSkip,
                         child: const Text(
                           '건너뛰기',
                           style: TextStyle(
@@ -94,19 +163,18 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
               ],
             ),
           ),
-
-          // 2. 상태창 (팝업) 오버레이
           if (_showPopup)
             Container(
-              color: Colors.black.withOpacity(0.55), // 배경을 어둡게 처리
+              color: Colors.black.withValues(alpha: 0.55),
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40.0),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 24.0),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 32.0, horizontal: 24.0),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2C2C34), // 팝업창 짙은 배경
+                      color: const Color(0xFF2C2C34),
                       borderRadius: BorderRadius.circular(16.0),
                     ),
                     child: Column(
@@ -117,7 +185,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF8B5CF6), // 연보라색 텍스트
+                            color: Color(0xFF8B5CF6),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -131,18 +199,15 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
-                        // 확인 버튼
                         SizedBox(
                           width: 120,
                           height: 48,
                           child: ElevatedButton(
                             onPressed: () {
-                              setState(() {
-                                _showPopup = false; // 확인 클릭 시 상태창 지우기
-                              });
+                              setState(() => _showPopup = false);
                             },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6B4EE6), // 밝은 보라색
+                              backgroundColor: const Color(0xFF6B4EE6),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),

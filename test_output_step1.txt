@@ -1,0 +1,4 @@
+Foreign Actors:
+ - 아만다 콜린, url: https://image.tmdb.org/t/p/w200/bFm5zt8vxD09Ez6irsJItmPigjq.jpg
+ - 제이슨 스타뎀, url: https://image.tmdb.org/t/p/w200/pXGSq2UpcDE2NMF8LR56QZf5U1q.jpg
+ - 佐々木麻由子, url: https://image.tmdb.org/t/p/w200/3SLMYw8kYB9Ubv7yEFVUMVCamj6.jpg

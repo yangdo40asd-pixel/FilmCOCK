@@ -1,0 +1,60 @@
+getPopularPeopleFromKofic() async {
+    // 1. KOFIC에서 주간 박스오피스 순위 가져오기 (상위 10개)
+    final boxOfficeList = await _getKoficWeeklyBoxOffice();
+    final topMovies = boxOfficeList.take(10);
+
+    final Set<String> actorNames = {};
+    final Set<String> directorNames = {};
+
+    // 2. 각 영화의 주연 배우(2명) 및 감독(1명) 이름 추출
+    for (var movie in topMovies) {
+      final people = await _getKoficMoviePeople(movie['movieCd']);
+      actorNames.addAll(
+        (people['actors'] ?? []).take(2).map((p) => p['peopleNm'] as String),
+      );
+      directorNames.addAll(
+        (people['directors'] ?? []).take(1).map((p) => p['peopleNm'] as String),
+      );
+    }
+
+    // 3. TMDB에서 이름으로 검색하여 Person 객체 생성 (배우, 감독 동시 처리)
+    Future<Person?> fetchPerson(String name) async {
+      final searchUrl = Uri.parse(
+        '$_baseUrl/search/person?api_key=$_apiKey&language=ko-KR&query=${Uri.encodeComponent(name)}',
+      );
+      final response = await http.get(searchUrl);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['results']?.isNotEmpty ?? false) {
+          return Person.fromJson(data['results'][0]);
+        }
+      }
+      return null;
+    }
+
+    final actorFutures = actorNames.map(fetchPerson).toList();
+    final directorFutures = directorNames.map(fetchPerson).toList();
+
+    final popularActors = (await Future.wait(
+      actorFutures,
+    )).whereType<Person>().toList();
+    final popularDirectors = (await Future.wait(
+      
+
+static Future<List<Person>> getPopularPeople() async {
+    final url = Uri.parse(
+      '$_baseUrl/person/popular?api_key=$_apiKey&language=ko-KR',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final utf8DecodedBody = utf8.decode(response.bodyBytes);
+      final List<dynamic> people = jsonDecode(utf8DecodedBody)['results'];
+      return people.map((person) => Person.fromJson(person)).toList();
+    } else {
+      throw Exception('Failed to load popular people');
+    }
+  }
+
+  // 특정 인물의 출연 영화 목록(필모그래피)을 가져오는 메서드
+  static Future<List<Movie>> getMovie

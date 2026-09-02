@@ -1,0 +1,236 @@
+_buildUpcomingMoviesList(context, movies: movies),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 5. 최신 상영 영화 📽️
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '최신 상영 영화',
+                emoji: '📽️',
+                onTap: () async {
+                  final movies = await nowPlayingMovies;
+                  if (!mounted) return;
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ListViewScreen(title: '최신 상영 영화', items: movies)));
+                },
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildMovieSection(
+              future: nowPlayingMovies,
+              builder: (movies) => _buildMovieHorizontalList(context, movies: movies),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 6. 애니메이션 🦄
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '애니메이션',
+                emoji: '🦄',
+                onTap: () {},
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildMovieSection(
+              future: animationMovies,
+              builder: (movies) => _buildMovieHorizontalList(context, movies: movies),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 7. 고전 명작 👍
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '고전 명작',
+                emoji: '👍',
+                onTap: () async {
+                  final movies = await topRatedMovies;
+                  if (!mounted) return;
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ListViewScreen(title: '고전 명작', items: movies)));
+                },
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildMovieSection(
+              future: topRatedMovies,
+              builder: (movies) => _buildMovieHorizontalList(context, movies: movies),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 8. 한국 배우 🇰🇷
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '한국 배우',
+                emoji: '🇰🇷',
+                onTap: () {
+                  popularKoreanActors?.then((actors) {
+                    if (actors.isNotEmpty) _navigateToListScreen(context, '한국 배우', actors);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildPersonSection(
+              future: popularKoreanActors ?? Future.value([]),
+              builder: (persons) => _buildPersonHorizontalList(context, persons: persons),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 9. 해외 배우 🌟
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '해외 배우',
+                emoji: '🌟',
+                onTap: () {
+                  popularForeignActors.then((actors) {
+                    if (actors.isNotEmpty) _navigateToListScreen(context, '해외 배우', actors);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildPersonSection(
+              future: popularForeignActors,
+              builder: (persons) => _buildPersonHorizontalList(context, persons: persons),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 10. 유명 감독 🎬
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '유명 감독',
+                emoji: '🎬',
+                onTap: () {
+                  popularKoreanDirectors?.then((directors) {
+                    if (directors.isNotEmpty) _navigateToListScreen(context, '유명 감독', directors);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildPersonSection(
+              future: popularKoreanDirectors ?? Future.value([]),
+              builder: (persons) => _buildPersonHorizontalList(context, persons: persons),
+            ),
+            const SizedBox(height: 24.0),
+
+            // 11. 리뷰 채널 🎤
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: SectionHeader(
+                title: '리뷰 채널',
+                emoji: '🎤',
+                onTap: () {},
+              ),
+            ),
+            const SizedBox(height: 12.0),
+            _buildReviewChannelList(),
+            
+            const SizedBox(height: 40.0),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 헬퍼 및 UI 빌더 메서드들 ---
+
+  Widget _buildMovieSection({
+    required Future<List<Movie>> future,
+    required Widget Function(List<Movie>) builder,
+  }) {
+    return FutureBuilder<List<Movie>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 180, child: Center(child: CircularProgressIndicator()));
+        } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(height: 180, child: Center(child: Text('데이터 없음', style: TextStyle(color: Colors.white54))));
+        }
+        return builder(snapshot.data!);
+      },
+    );
+  }
+
+  Widget _buildPersonSection({
+    required Future<List<Person>> future,
+    required Widget Function(List<Person>) builder,
+  }) {
+    return FutureBuilder<List<Person>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 140, child: Center(child: CircularProgressIndicator()));
+        } else if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox(height: 140, child: Center(child: Text('인물 정보 없음', style: TextStyle(color: Colors.white54))));
+        }
+        return builder(snapshot.data!);
+      },
+    );
+  }
+
+  void _navigateToListScreen(BuildContext context, String title, List<dynamic> items) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ListViewScreen(title: title, items: items)),
+    );
+  }
+
+  Widget _buildHeroCarousel(List<Movie> movies) {
+    if (movies.isEmpty) return const SizedBox();
+    return CarouselSlider.builder(
+      itemCount: min(movies.length, 5), // 상위 5개만
+      itemBuilder: (context, index, realIndex) {
+        final movie = movies[index];
+        return GestureDetector(
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => MovieDetailScreen(movie: movie))),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(movie.fullBackdropUrl, fit: BoxFit.cover, errorBuilder: (c,e,s) => Container(color: Colors.grey)),
+              // 그라데이션 오버레이
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.black.withOpacity(0.9), Colors.transparent],
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        movie.title,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Text('인기', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      options: CarouselOptions(
+        height: 250,
+        viewportFraction: 1.0,
+        autoPlay: true,
+        autoPlayInterval: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  

@@ -2,6 +2,8 @@ import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
 import 'package:flutter/material.dart';
 // 1. shared_preferences 패키지를 import
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:filmcock_app/data/models/mbti_info.dart';
+import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
 
 class MbtiScreen extends StatefulWidget {
   const MbtiScreen({super.key});
@@ -14,21 +16,22 @@ class _MbtiScreenState extends State<MbtiScreen> {
   String? _selectedMbti;
 
   // 2. 화면 이동 함수를 async로 변경하고, 저장할 값을 받도록 수정
-  void _navigateToHome(BuildContext context, {String? mbtiToSave}) async {
-    // 3. SharedPreferences 인스턴스를 가져옴
+  void _navigateToGenre(BuildContext context, {String? mbtiToSave}) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // 4. 저장할 값이 있다면 (MBTI 또는 'skipped')
     if (mbtiToSave != null) {
-      // 5. 'user_mbti'라는 키로 값을 기기에 저장
       await prefs.setString('user_mbti', mbtiToSave);
     }
 
-    // 6. 메인 화면으로 이동 (pushReplacement)
     if (mounted) {
-      // 위젯이 아직 화면에 있는지 확인
+      MbtiInfo mbtiInfo = const MbtiInfo(
+        id: 'NONE', title: '', description: '', feature: '', recommendedGenres: '', genreIds: [], famousPeople: [], svgAsset: ''
+      );
+      if (mbtiToSave != null && mbtiToSave != 'skipped' && mbtiToSave != 'NONE') {
+        final found = getMbtiInfoById(mbtiToSave);
+        if (found != null) mbtiInfo = found;
+      }
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const MainScreen()),
+        MaterialPageRoute(builder: (context) => GenreSelectScreen(mbtiInfo: mbtiInfo)),
       );
     }
   }
@@ -123,7 +126,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
               ElevatedButton(
                 onPressed: () {
                   // 7. 선택한 MBTI 값을 저장하도록 전달
-                  _navigateToHome(context, mbtiToSave: _selectedMbti);
+                  _navigateToGenre(context, mbtiToSave: _selectedMbti);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purpleAccent,
@@ -145,7 +148,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
               TextButton(
                 onPressed: () {
                   // 8. 'skipped'라는 값을 저장 (다시 물어보지 않도록)
-                  _navigateToHome(context, mbtiToSave: 'skipped');
+                  _navigateToGenre(context, mbtiToSave: 'skipped');
                 },
                 child: const Text(
                   '건너뛰기',

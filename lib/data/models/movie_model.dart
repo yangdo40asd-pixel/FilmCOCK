@@ -56,14 +56,21 @@ class Genre {
 }
 
 class Person {
+  static final RegExp _unsupportedDisplayScript = RegExp(
+    r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F]',
+    unicode: true,
+  );
+
   final int id;
   final String name;
+  final String originalName;
   final String? profilePath;
   final String knownForDepartment;
 
   Person({
     required this.id,
     required this.name,
+    this.originalName = '',
     this.profilePath,
     required this.knownForDepartment,
   });
@@ -71,7 +78,8 @@ class Person {
   factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
       id: json['id'],
-      name: json['name'],
+      name: json['name'] ?? '',
+      originalName: json['original_name'] ?? '',
       profilePath: json['profile_path'],
       knownForDepartment: json['known_for_department'] ?? '',
     );
@@ -79,6 +87,14 @@ class Person {
 
   String get fullProfileUrl =>
       profilePath != null ? 'https://image.tmdb.org/t/p/w200$profilePath' : '';
+
+  // TMDB의 ko-KR 응답을 우선 사용하되, 번역이 없는 비라틴 원문은 화면에서 제외한다.
+  String get displayName {
+    if (name.trim().isEmpty || _unsupportedDisplayScript.hasMatch(name)) {
+      return '';
+    }
+    return name.trim();
+  }
 }
 
 // KOFIC API 응답을 위한 모델

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
+import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.dart';
 
 class ListViewScreen extends StatelessWidget {
   final String title;
@@ -25,7 +26,9 @@ class ListViewScreen extends StatelessWidget {
           crossAxisSpacing: 16.0,
           mainAxisSpacing: 16.0,
           // 아이템의 가로세로 비율 조정
-          childAspectRatio: (items.first is Movie) ? (100 / 180) : (80 / 110),
+          childAspectRatio: items.isNotEmpty && items.first is Movie
+              ? (100 / 180)
+              : (80 / 110),
         ),
         itemBuilder: (context, index) {
           final item = items[index];
@@ -80,7 +83,14 @@ class ListViewScreen extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => ActorDetailScreen(actor: person)),
+          MaterialPageRoute(
+            builder: (_) => title == '유명 감독'
+                ? ArtistDetailScreen(
+                    artistId: person.id,
+                    artistName: person.displayName,
+                  )
+                : ActorDetailScreen(actor: person),
+          ),
         );
       },
       child: Column(
@@ -99,7 +109,7 @@ class ListViewScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8.0),
           Text(
-            person.name,
+            person.displayName,
             style: const TextStyle(color: Colors.white, fontSize: 12.0),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/core/config/secrets.dart';
+import 'package:filmcock_app/core/utils/language_filter.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -8,7 +9,10 @@ class ApiService {
   static const String _apiKey = ApiSecrets.apiKey;
 
   // 여러 종류의 영화 목록을 가져오는 범용 함수
-  static Future<List<Movie>> getMovies(String endpoint) async {
+  static Future<List<Movie>> getMovies(
+    String endpoint, {
+    bool isUpcoming = false,
+  }) async {
     final url = Uri.parse(
       '$_baseUrl/movie/$endpoint?api_key=$_apiKey&language=ko-KR&page=1',
     );
@@ -21,7 +25,8 @@ class ApiService {
       final List<dynamic> results = data['results'];
 
       // JSON 맵 리스트를 Movie 객체 리스트로 변환
-      return results.map((json) => Movie.fromJson(json)).toList();
+      final movies = results.map((json) => Movie.fromJson(json)).toList();
+      return LanguageFilter.filterMovies(movies, isUpcoming: false);
     } else {
       // 에러 발생 시 예외 처리
       throw Exception('Failed to load movies from $endpoint');
@@ -62,14 +67,67 @@ class ApiService {
     }
   }
 
+  // '방영 예정일 영화' 목록을 가져오는 함수
+  static Future<List<Movie>> getUpcomingMovies() async {
+    final url = Uri.parse(
+      '$_baseUrl/movie/upcoming?api_key=$_apiKey&language=ko-KR&page=1&region=KR',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final utf8DecodedBody = utf8.decode(response.bodyBytes);
+      final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
+      final List<dynamic> results = data['results'];
+
+      final now = DateTime.now();
+      final todayStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final movies = results
+          .map((json) => Movie.fromJson(json))
+          .where(
+            (m) =>
+                m.releaseDate.isNotEmpty &&
+                m.releaseDate.compareTo(todayStr) > 0,
+          )
+          .toList();
+
+      movies.sort((a, b) => a.releaseDate.compareTo(b.releaseDate));
+
+      return LanguageFilter.filterMovies(movies, isUpcoming: true);
+    } else {
+      throw Exception('Failed to load upcoming movies');
+    }
+  }
+
+  // '고전 명작' 목록을 가져오는 함수
+  static Future<List<Movie>> getTopRatedMovies() async {
+    final url = Uri.parse(
+      '$_baseUrl/movie/top_rated?api_key=$_apiKey&language=ko-KR&page=1',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final utf8DecodedBody = utf8.decode(response.bodyBytes);
+      final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
+      final List<dynamic> results = data['results'];
+      final movies = results.map((json) => Movie.fromJson(json)).toList();
+      return LanguageFilter.filterMovies(movies, isUpcoming: false);
+    } else {
+      throw Exception('Failed to load top rated movies');
+    }
+  }
+
   // '최신 상영 영화' 목록을 가져오는 함수
   static Future<List<Movie>> getNowPlayingMovies() async {
-    return getMovies('now_playing');
+    // KOFIC 일간 박스오피스 기반 TMDB 브릿지 검색 반환
+    return _getMoviesFromKofic(false);
   }
 
   // '인기 영화' 목록을 가져오는 함수
   static Future<List<Movie>> getPopularMovies() async {
-    return getMovies('popular');
+    // KOFIC 주간 박스오피스 기반 TMDB 브릿지 검색 반환
+    return _getMoviesFromKofic(true);
   }
 
   // '추천 영화' 목록을 가져오는 함수
@@ -118,26 +176,62 @@ class ApiService {
       final utf8DecodedBody = utf8.decode(response.bodyBytes);
       final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
       final List<dynamic> results = data['results'];
-      return results.map((json) => Movie.fromJson(json)).toList();
+      final movies = results.map((json) => Movie.fromJson(json)).toList();
+      return LanguageFilter.filterMovies(movies, isUpcoming: false);
     } else {
       throw Exception('Failed to load movies for genre $genreId');
     }
   }
 
   // 인기 인물(배우, 감독) 목록을 가져오는 메서드
-  static Future<List<Person>> getPopularPeople() async {
+
+  // 고전명작 (2000~2010년) 가져오기
+  static Future<List<Movie>> getClassicMovies() async {
     final url = Uri.parse(
-      '$_baseUrl/person/popular?api_key=$_apiKey&language=ko-KR',
+      '$_baseUrl/discover/movie?api_key=$_apiKey&language=ko-KR&primary_release_date.gte=2000-01-01&primary_release_date.lte=2010-12-31&sort_by=vote_average.desc&vote_count.gte=500&page=1',
     );
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final utf8DecodedBody = utf8.decode(response.bodyBytes);
-      final List<dynamic> people = jsonDecode(utf8DecodedBody)['results'];
-      return people.map((person) => Person.fromJson(person)).toList();
+      final List<dynamic> results = jsonDecode(utf8DecodedBody)['results'];
+      final movies = results.map((movie) => Movie.fromJson(movie)).toList();
+      return LanguageFilter.filterMovies(movies);
     } else {
+      throw Exception('Failed to load classic movies');
+    }
+  }
+
+  static Future<List<Person>> getPopularPeople() async {
+    final List<Person> allForeignActors = [];
+    final koreanPattern = RegExp(r'[가-힣]');
+
+    // 페이지 1~4까지 가져오기 (총 80명 중 한국인 필터링)
+    for (int i = 1; i <= 4; i++) {
+      final url = Uri.parse(
+        '$_baseUrl/person/popular?api_key=$_apiKey&language=ko-KR&page=$i',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final utf8DecodedBody = utf8.decode(response.bodyBytes);
+        final List<dynamic> people = jsonDecode(utf8DecodedBody)['results'];
+        final parsed = people.map((person) => Person.fromJson(person)).toList();
+
+        final filtered = parsed.where((p) {
+          return p.knownForDepartment == 'Acting' &&
+              !koreanPattern.hasMatch(p.originalName) &&
+              p.displayName.isNotEmpty;
+        }).toList();
+        allForeignActors.addAll(filtered);
+      }
+    }
+
+    if (allForeignActors.isEmpty) {
       throw Exception('Failed to load popular people');
     }
+
+    return allForeignActors;
   }
 
   // 특정 인물의 출연 영화 목록(필모그래피)을 가져오는 메서드
@@ -153,7 +247,10 @@ class ApiService {
       // 'cast' 목록 (배우로서 출연한 작품)과 'crew' 목록 (감독/스태프로 참여한 작품)을 합칠 수 있습니다.
       // 여기서는 'cast' 목록만 가져오겠습니다.
       final List<dynamic> credits = data['cast'];
-      return credits.map((movieJson) => Movie.fromJson(movieJson)).toList();
+      final movies = credits
+          .map((movieJson) => Movie.fromJson(movieJson))
+          .toList();
+      return LanguageFilter.filterMovies(movies, isUpcoming: false);
     } else {
       throw Exception('Failed to load movie credits for person $personId');
     }
@@ -165,6 +262,63 @@ class ApiService {
       'http://www.kobis.or.kr/kobisopenapi/webservice/rest';
 
   // KOFIC API로 주간 박스오피스 순위 가져오기 (지난주 기준)
+
+  // KOFIC API를 통해 일간 박스오피스 목록 조회 (어제 기준)
+  static Future<List<dynamic>> _getKoficDailyBoxOffice() async {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final targetDt =
+        '${yesterday.year}${yesterday.month.toString().padLeft(2, '0')}${yesterday.day.toString().padLeft(2, '0')}';
+
+    final url = Uri.parse(
+      '$_koficBaseUrl/boxoffice/searchDailyBoxOfficeList.json?key=$_koficApiKey&targetDt=$targetDt',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final utf8DecodedBody = utf8.decode(response.bodyBytes);
+      final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
+      return data['boxOfficeResult']['dailyBoxOfficeList'] ?? [];
+    } else {
+      throw Exception('Failed to load KOFIC daily box office');
+    }
+  }
+
+  // KOFIC 박스오피스 제목 기반으로 TMDB 영화 정보 검색 및 브릿지
+  static Future<List<Movie>> _getMoviesFromKofic(bool isWeekly) async {
+    final boxOfficeList = isWeekly
+        ? await _getKoficWeeklyBoxOffice()
+        : await _getKoficDailyBoxOffice();
+
+    List<Movie> bridgeMovies = [];
+
+    for (var koficMovie in boxOfficeList) {
+      final movieNm = koficMovie['movieNm'];
+      final url = Uri.parse(
+        '$_baseUrl/search/movie?api_key=$_apiKey&query=${Uri.encodeComponent(movieNm)}&language=ko-KR&page=1',
+      );
+
+      try {
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final utf8DecodedBody = utf8.decode(response.bodyBytes);
+          final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
+          final List<dynamic> results = data['results'];
+
+          if (results.isNotEmpty) {
+            // 가장 연관도 높은 첫 번째 결과만 사용
+            bridgeMovies.add(Movie.fromJson(results.first));
+          }
+        }
+      } catch (e) {
+        print('TMDB search error for $movieNm: $e');
+      }
+    }
+
+    // 최종 언어 필터 거쳐서 반환
+    return LanguageFilter.filterMovies(bridgeMovies);
+  }
+
   static Future<List<dynamic>> _getKoficWeeklyBoxOffice() async {
     // 지난주 날짜 계산 (일요일 기준)
     final now = DateTime.now();
@@ -266,7 +420,8 @@ class ApiService {
       final utf8DecodedBody = utf8.decode(response.bodyBytes);
       final Map<String, dynamic> data = jsonDecode(utf8DecodedBody);
       final List<dynamic> results = data['results'];
-      return results.map((json) => Movie.fromJson(json)).toList();
+      final movies = results.map((json) => Movie.fromJson(json)).toList();
+      return LanguageFilter.filterMovies(movies, isUpcoming: false);
     } else {
       throw Exception('Failed to search movies for query: $query');
     }
@@ -285,7 +440,7 @@ class ApiService {
     for (var movie in topMovies) {
       final people = await _getKoficMoviePeople(movie['movieCd']);
       actorNames.addAll(
-        (people['actors'] ?? []).take(2).map((p) => p['peopleNm'] as String),
+        (people['actors'] ?? []).take(5).map((p) => p['peopleNm'] as String),
       );
       directorNames.addAll(
         (people['directors'] ?? []).take(1).map((p) => p['peopleNm'] as String),
@@ -310,12 +465,21 @@ class ApiService {
     final actorFutures = actorNames.map(fetchPerson).toList();
     final directorFutures = directorNames.map(fetchPerson).toList();
 
-    final popularActors = (await Future.wait(
-      actorFutures,
-    )).whereType<Person>().toList();
-    final popularDirectors = (await Future.wait(
-      directorFutures,
-    )).whereType<Person>().toList();
+    final koreanPattern = RegExp(r'[가-힣]');
+    final popularActors = (await Future.wait(actorFutures))
+        .whereType<Person>()
+        .where((p) {
+          return koreanPattern.hasMatch(p.originalName) &&
+              p.displayName.isNotEmpty;
+        })
+        .toList();
+    final popularDirectors = (await Future.wait(directorFutures))
+        .whereType<Person>()
+        .where((p) {
+          return koreanPattern.hasMatch(p.originalName) &&
+              p.displayName.isNotEmpty;
+        })
+        .toList();
 
     return {'actors': popularActors, 'directors': popularDirectors};
   }

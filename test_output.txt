@@ -1,0 +1,21 @@
+--- Testing Upcoming Movies ---
+Upcoming count: 19
+ - 딥 워터 (Release: 2026-09-09)
+ - 더 드라마 (Release: 2026-09-09)
+ - 프랙티컬 매직: 새로운 챕터 (Release: 2026-09-09)
+
+--- Testing Korean Actors ---
+Korean Actors count: 12
+ - 이정은 / 이정은
+ - 공효진 / 공효진
+ - 박소담 / 박소담
+ - 이연 / 이연
+ - 변요한 / 변요한
+
+--- Testing Foreign Actors ---
+Foreign Actors count: 70
+ - 아만다 콜린 / Amanda Collin
+ - 제이슨 스타뎀 / Jason Statham
+ - Manni L. Perez / Manni L. Perez
+ - 앤 해서웨이 / Anne Hathaway
+ - 팀 커리 / Tim Curry

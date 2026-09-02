@@ -79,7 +79,7 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
                     ),
                     color: Colors.black54,
                     child: Text(
-                      '배우: ${widget.actor.name}',
+                      '배우: ${widget.actor.displayName}',
                       style: const TextStyle(
                         fontSize: 22,
                         color: Colors.white,
