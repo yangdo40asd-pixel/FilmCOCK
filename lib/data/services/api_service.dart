@@ -164,6 +164,48 @@ class ApiService {
     }
   }
 
+  // 국내(KR) 영화 시청 가능 서비스 정보를 가져오는 함수
+  static Future<List<WatchProvider>> getMovieWatchProviders(int movieId) async {
+    final url = Uri.parse(
+      '$_baseUrl/movie/$movieId/watch/providers?api_key=$_apiKey',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load watch providers for movie $movieId');
+    }
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes))
+        as Map<String, dynamic>;
+    final korea = data['results']?['KR'] as Map<String, dynamic>?;
+    if (korea == null) return [];
+
+    final link = korea['link'] as String? ?? '';
+    const offerTypes = <String, String>{
+      'flatrate': '구독',
+      'free': '무료',
+      'ads': '광고 포함',
+      'rent': '대여',
+      'buy': '구매',
+    };
+    final providers = <WatchProvider>[];
+
+    for (final entry in offerTypes.entries) {
+      final rawProviders = korea[entry.key] as List<dynamic>? ?? [];
+      providers.addAll(
+        rawProviders.whereType<Map<String, dynamic>>().map(
+          (provider) => WatchProvider.fromJson(
+            provider,
+            offerType: entry.value,
+            link: link,
+          ),
+        ),
+      );
+    }
+
+    return providers;
+  }
+
   // 특정 장르의 영화 목록을 가져오는 함수
   static Future<List<Movie>> getMoviesByGenre(int genreId) async {
     final url = Uri.parse(

@@ -1,7 +1,10 @@
 import 'package:filmcock_app/data/services/api_service.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
+import 'package:filmcock_app/presentation/widgets/watch_options_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class MovieDetailScreen extends StatefulWidget {
@@ -18,6 +21,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   late Future<List<Person>> movieCredits;
   late Future<List<Movie>> recommendedMovies;
   late Future<List<Video>> movieVideos;
+  bool _isLiked = false;
+  bool _isWatched = false;
 
   @override
   void initState() {
@@ -27,6 +32,50 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     movieCredits = ApiService.getMovieCredits(widget.movie.id);
     recommendedMovies = ApiService.getRecommendedMovies(widget.movie.id);
     movieVideos = ApiService.getMovieVideos(widget.movie.id);
+    _loadLocalActions();
+  }
+
+  Future<void> _loadLocalActions() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _isLiked = prefs.getBool('liked_movie_${widget.movie.id}') ?? false;
+      _isWatched = prefs.getBool('watched_movie_${widget.movie.id}') ?? false;
+    });
+  }
+
+  Future<void> _toggleLocalAction({required bool liked}) async {
+    final nextValue = liked ? !_isLiked : !_isWatched;
+    setState(() {
+      if (liked) {
+        _isLiked = nextValue;
+      } else {
+        _isWatched = nextValue;
+      }
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      '${liked ? 'liked' : 'watched'}_movie_${widget.movie.id}',
+      nextValue,
+    );
+  }
+
+  Future<void> _copyMovieLink() async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: 'https://www.themoviedb.org/movie/${widget.movie.id}',
+      ),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('영화 링크를 복사했습니다.')));
+  }
+
+  void _showCommentsNotice() {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('댓글 기능을 준비 중입니다.')));
   }
 
   // 예고편 재생 다이얼로그
@@ -160,7 +209,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Text(detail.releaseDate.substring(0, 4)),
+                  Text(_formatReleaseDate(detail.releaseDate)),
                   const SizedBox(width: 10),
                   Text('⭐️ ${detail.voteAverage.toStringAsFixed(1)}'),
                 ],
@@ -177,6 +226,57 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                     )
                     .toList(),
               ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => WatchOptionsSheet.show(
+                    context,
+                    movieId: detail.id,
+                    movieTitle: detail.title,
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('보러가기'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7656E8),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildActionButton(
+                    icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                    label: '좋아요',
+                    isSelected: _isLiked,
+                    onPressed: () => _toggleLocalAction(liked: true),
+                  ),
+                  _buildActionButton(
+                    icon: _isWatched
+                        ? Icons.check_circle
+                        : Icons.check_circle_outline,
+                    label: '봤어요',
+                    isSelected: _isWatched,
+                    onPressed: () => _toggleLocalAction(liked: false),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.comment_outlined,
+                    label: '댓글',
+                    onPressed: _showCommentsNotice,
+                  ),
+                  _buildActionButton(
+                    icon: Icons.share_outlined,
+                    label: '공유',
+                    onPressed: _copyMovieLink,
+                  ),
+                ],
+              ),
               const SizedBox(height: 16),
               const Text(
                 '줄거리',
@@ -192,6 +292,37 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
         },
       ),
     );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    bool isSelected = false,
+  }) {
+    final color = isSelected ? const Color(0xFF7656E8) : Colors.white70;
+    return Expanded(
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 28),
+              const SizedBox(height: 5),
+              Text(label, style: TextStyle(color: color, fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatReleaseDate(String releaseDate) {
+    if (releaseDate.length < 4) return '개봉일 정보 없음';
+    return releaseDate.replaceAll('-', '. ');
   }
 
   // 3. 출연진 섹션
@@ -246,7 +377,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              person.name,
+                              person.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
