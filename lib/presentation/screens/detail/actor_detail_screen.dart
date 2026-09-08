@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
-import 'package:filmcock_app/data/dummy/dummy_data.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
 
 class ActorDetailScreen extends StatefulWidget {
@@ -19,32 +18,7 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // 수작업으로 정리된 필모그래피 목록을 가져옵니다.
-    filmography = _getManualFilmography(widget.actor.id);
-  }
-
-  // 수동으로 정의된 영화 제목 목록을 기반으로 Movie 객체 목록을 가져오는 함수
-  Future<List<Movie>> _getManualFilmography(int actorId) async {
-    // dummy_data.dart에 정의된 영화 ID 목록을 확인합니다.
-    final movieIds = manualFilmography[actorId];
-
-    // 해당 배우의 목록이 없으면 API를 통해 가져오거나 빈 리스트를 반환합니다.
-    if (movieIds == null || movieIds.isEmpty) {
-      return ApiService.getMovieCreditsForPerson(actorId);
-    }
-
-    final List<Movie> movies = [];
-    for (int id in movieIds) {
-      try {
-        // 각 영화 ID로 상세 정보를 직접 가져옵니다.
-        final movie = await ApiService.getMovieDetail(id);
-        movies.add(movie);
-      } catch (e) {
-        // 특정 영화 정보를 가져오다 실패하면 로그를 남기고 넘어갑니다.
-        print('Failed to get movie detail for id $id: $e');
-      }
-    }
-    return movies;
+    filmography = ApiService.getPersonFilmography(widget.actor.id);
   }
 
   @override
@@ -118,14 +92,14 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '주요 작품들',
+            '주요 작품들이에요',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           FutureBuilder<List<Movie>>(
             future: filmography,
             builder: (context, snapshot) {

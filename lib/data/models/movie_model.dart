@@ -60,12 +60,14 @@ class Person {
     r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F]',
     unicode: true,
   );
+  static final RegExp _koreanDisplayName = RegExp(r'^[가-힣\s·ㆍ]+$');
 
   final int id;
   final String name;
   final String originalName;
   final String? profilePath;
   final String knownForDepartment;
+  final int filmographyCount;
 
   Person({
     required this.id,
@@ -73,6 +75,7 @@ class Person {
     this.originalName = '',
     this.profilePath,
     required this.knownForDepartment,
+    this.filmographyCount = 0,
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -82,6 +85,7 @@ class Person {
       originalName: json['original_name'] ?? '',
       profilePath: json['profile_path'],
       knownForDepartment: json['known_for_department'] ?? '',
+      filmographyCount: json['filmography_count'] as int? ?? 0,
     );
   }
 
@@ -94,6 +98,20 @@ class Person {
       return '';
     }
     return name.trim();
+  }
+
+  bool get hasKoreanDisplayName =>
+      displayName.isNotEmpty && _koreanDisplayName.hasMatch(displayName);
+
+  Person copyWith({int? filmographyCount}) {
+    return Person(
+      id: id,
+      name: name,
+      originalName: originalName,
+      profilePath: profilePath,
+      knownForDepartment: knownForDepartment,
+      filmographyCount: filmographyCount ?? this.filmographyCount,
+    );
   }
 }
 
@@ -173,7 +191,6 @@ class WatchProvider {
     );
   }
 
-  String get fullLogoUrl => logoPath.isEmpty
-      ? ''
-      : 'https://image.tmdb.org/t/p/w200$logoPath';
+  String get fullLogoUrl =>
+      logoPath.isEmpty ? '' : 'https://image.tmdb.org/t/p/w200$logoPath';
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/models/mbti_info.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
-import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/mbti_panel_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================================
 // MBTI 시작 화면 (안내 팝업 + 흔백 배경)
@@ -53,12 +53,24 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('user_mbti');
+                      if (!mounted || !dialogContext.mounted) return;
                       Navigator.of(dialogContext).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const GenreSelectScreen(
-                            mbtiInfo: MbtiInfo(id: 'NONE', title: '건너뛰기', description: '', feature: '', recommendedGenres: '', genreIds: [], famousPeople: [], svgAsset: ''),
+                            mbtiInfo: MbtiInfo(
+                              id: 'NONE',
+                              title: '건너뛰기',
+                              description: '',
+                              feature: '',
+                              recommendedGenres: '',
+                              genreIds: [],
+                              famousPeople: [],
+                              svgAsset: '',
+                            ),
                           ),
                         ),
                       );
@@ -66,9 +78,12 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text(
                       '예',
@@ -125,7 +140,8 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                           onPressed: () {
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                  builder: (_) => MbtiPanelScreen()),
+                                builder: (_) => MbtiPanelScreen(),
+                              ),
                             );
                           },
                           style: ElevatedButton.styleFrom(
@@ -172,7 +188,9 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        vertical: 32.0, horizontal: 24.0),
+                      vertical: 32.0,
+                      horizontal: 24.0,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2C2C34),
                       borderRadius: BorderRadius.circular(16.0),

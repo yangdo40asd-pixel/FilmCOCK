@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:filmcock_app/data/models/movie_model.dart';
+import 'package:filmcock_app/data/dummy/korean_people_data.dart';
 import 'package:filmcock_app/core/config/secrets.dart';
 import 'package:filmcock_app/core/utils/language_filter.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   static const String _baseUrl = 'https://api.themoviedb.org/3';
   static const String _apiKey = ApiSecrets.apiKey;
+  static Future<List<Person>>? _popularPeoplePagesCache;
 
   // 여러 종류의 영화 목록을 가져오는 범용 함수
   static Future<List<Movie>> getMovies(
@@ -175,8 +177,8 @@ class ApiService {
       throw Exception('Failed to load watch providers for movie $movieId');
     }
 
-    final data = jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+    final data =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     final korea = data['results']?['KR'] as Map<String, dynamic>?;
     if (korea == null) return [];
 
@@ -245,35 +247,22 @@ class ApiService {
   }
 
   static Future<List<Person>> getPopularPeople() async {
-    final List<Person> allForeignActors = [];
     final koreanPattern = RegExp(r'[가-힣]');
-
-    // 페이지 1~4까지 가져오기 (총 80명 중 한국인 필터링)
-    for (int i = 1; i <= 4; i++) {
-      final url = Uri.parse(
-        '$_baseUrl/person/popular?api_key=$_apiKey&language=ko-KR&page=$i',
-      );
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final utf8DecodedBody = utf8.decode(response.bodyBytes);
-        final List<dynamic> people = jsonDecode(utf8DecodedBody)['results'];
-        final parsed = people.map((person) => Person.fromJson(person)).toList();
-
-        final filtered = parsed.where((p) {
-          return p.knownForDepartment == 'Acting' &&
-              !koreanPattern.hasMatch(p.originalName) &&
-              p.displayName.isNotEmpty;
-        }).toList();
-        allForeignActors.addAll(filtered);
-      }
-    }
+    final people = await _getPopularPeoplePages();
+    final allForeignActors = people.where((p) {
+      return p.knownForDepartment == 'Acting' &&
+          !koreanPattern.hasMatch(p.originalName) &&
+          p.hasKoreanDisplayName;
+    }).toList();
 
     if (allForeignActors.isEmpty) {
       throw Exception('Failed to load popular people');
     }
 
-    return allForeignActors;
+    final uniqueActors = <int, Person>{
+      for (final person in allForeignActors) person.id: person,
+    }.values.toList();
+    return uniqueActors;
   }
 
   // 특정 인물의 출연 영화 목록(필모그래피)을 가져오는 메서드
@@ -298,10 +287,64 @@ class ApiService {
     }
   }
 
+  static Future<List<Movie>> getPersonFilmography(
+    int personId, {
+    bool directing = false,
+  }) async {
+    final url = Uri.parse(
+      '$_baseUrl/person/$personId/movie_credits?api_key=$_apiKey&language=ko-KR',
+    );
+    final response = await http.get(url);
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load filmography for person $personId');
+    }
+
+    final data =
+        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final key = directing ? 'crew' : 'cast';
+    final credits = data[key] as List<dynamic>? ?? [];
+    final selected = directing
+        ? credits.where((item) {
+            final department = item['department'] as String? ?? '';
+            final job = item['job'] as String? ?? '';
+            return department == 'Directing' || job == 'Director';
+          })
+        : credits;
+
+    final seenIds = <int>{};
+    final movies = <Movie>[];
+    for (final credit in selected) {
+      final movie = Movie.fromJson(credit as Map<String, dynamic>);
+      if (seenIds.add(movie.id)) movies.add(movie);
+    }
+
+    movies.sort((a, b) => b.releaseDate.compareTo(a.releaseDate));
+    return LanguageFilter.filterMovies(movies, isUpcoming: false);
+  }
+
   // --- 영화진흥위원회(KOFIC) API 관련 ---
   static const String _koficApiKey = '3dfc7b6fd0866165a54b374be9c4397c';
   static const String _koficBaseUrl =
       'http://www.kobis.or.kr/kobisopenapi/webservice/rest';
+
+  static Future<http.Response> _getKofic(Uri url) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final response = await http.get(url).timeout(const Duration(seconds: 15));
+        if (response.statusCode == 200) return response;
+        lastError = 'HTTP ${response.statusCode}';
+        if (response.statusCode < 500 && response.statusCode != 429) break;
+      } catch (error) {
+        lastError = error;
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+      }
+    }
+    throw Exception('KOBIS request failed: $lastError');
+  }
 
   // KOFIC API로 주간 박스오피스 순위 가져오기 (지난주 기준)
 
@@ -315,7 +358,7 @@ class ApiService {
     final url = Uri.parse(
       '$_koficBaseUrl/boxoffice/searchDailyBoxOfficeList.json?key=$_koficApiKey&targetDt=$targetDt',
     );
-    final response = await http.get(url);
+    final response = await _getKofic(url);
 
     if (response.statusCode == 200) {
       final utf8DecodedBody = utf8.decode(response.bodyBytes);
@@ -371,7 +414,7 @@ class ApiService {
     final url = Uri.parse(
       '$_koficBaseUrl/boxoffice/searchWeeklyBoxOfficeList.json?key=$_koficApiKey&targetDt=$targetDt&weekGb=0', // 0: 주간
     );
-    final response = await http.get(url);
+    final response = await _getKofic(url);
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -388,7 +431,7 @@ class ApiService {
     final url = Uri.parse(
       '$_koficBaseUrl/movie/searchMovieInfo.json?key=$_koficApiKey&movieCd=$movieCd',
     );
-    final response = await http.get(url);
+    final response = await _getKofic(url);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       // API 응답 구조에 따라 배우 목록 반환
@@ -412,7 +455,7 @@ class ApiService {
       final url = Uri.parse(
         '$_koficBaseUrl/people/searchPeopleList.json?key=$_koficApiKey&peopleNm=${Uri.encodeComponent(name)}',
       );
-      final response = await http.get(url);
+      final response = await _getKofic(url);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -469,60 +512,77 @@ class ApiService {
     }
   }
 
-  // KOFIC 박스오피스 기반으로 인기 배우와 감독 목록을 가져오는 통합 함수
+  // 대한민국 대표/인기 한국 배우 및 감독 목록을 가져오는 통합 함수
   static Future<Map<String, List<Person>>> getPopularPeopleFromKofic() async {
-    // 1. KOFIC에서 주간 박스오피스 순위 가져오기 (상위 10개)
-    final boxOfficeList = await _getKoficWeeklyBoxOffice();
-    final topMovies = boxOfficeList.take(10);
+    final actors = List<Person>.from(KoreanPeopleData.masterActors);
+    final directors = List<Person>.from(KoreanPeopleData.masterDirectors);
 
-    final Set<String> actorNames = {};
-    final Set<String> directorNames = {};
-
-    // 2. 각 영화의 주연 배우(2명) 및 감독(1명) 이름 추출
-    for (var movie in topMovies) {
-      final people = await _getKoficMoviePeople(movie['movieCd']);
-      actorNames.addAll(
-        (people['actors'] ?? []).take(5).map((p) => p['peopleNm'] as String),
+    // KOFIC 일간 박스오피스 상위작에서 현재 활약 중인 주연 배우들을 선두에 배치 (안전 타임아웃 3초)
+    try {
+      final boxOfficeList = await _getKoficDailyBoxOffice().timeout(
+        const Duration(seconds: 3),
       );
-      directorNames.addAll(
-        (people['directors'] ?? []).take(1).map((p) => p['peopleNm'] as String),
-      );
-    }
-
-    // 3. TMDB에서 이름으로 검색하여 Person 객체 생성 (배우, 감독 동시 처리)
-    Future<Person?> fetchPerson(String name) async {
-      final searchUrl = Uri.parse(
-        '$_baseUrl/search/person?api_key=$_apiKey&language=ko-KR&query=${Uri.encodeComponent(name)}',
-      );
-      final response = await http.get(searchUrl);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        if (data['results']?.isNotEmpty ?? false) {
-          return Person.fromJson(data['results'][0]);
+      final topMovies = boxOfficeList.take(5);
+      final currentActorNames = <String>[];
+      for (var movie in topMovies) {
+        final people = await _getKoficMoviePeople(movie['movieCd'] as String);
+        final movieActors = people['actors'] ?? [];
+        for (var actor in movieActors.take(3)) {
+          final name = actor['peopleNm'] as String?;
+          if (name != null && name.isNotEmpty) {
+            currentActorNames.add(name);
+          }
         }
       }
-      return null;
+
+      // 이미 마스터에 있는 배우는 상단으로 재배치
+      for (final name in currentActorNames.reversed) {
+        final existingIndex = actors.indexWhere((a) => a.name == name);
+        if (existingIndex > 0) {
+          final matched = actors.removeAt(existingIndex);
+          actors.insert(0, matched);
+        }
+      }
+    } catch (_) {
+      // 네트워크 예외 발생 시에도 마스터 데이터가 완벽하게 서비스되므로 무시
     }
 
-    final actorFutures = actorNames.map(fetchPerson).toList();
-    final directorFutures = directorNames.map(fetchPerson).toList();
+    return {
+      'actors': actors,
+      'directors': directors,
+    };
+  }
 
-    final koreanPattern = RegExp(r'[가-힣]');
-    final popularActors = (await Future.wait(actorFutures))
-        .whereType<Person>()
-        .where((p) {
-          return koreanPattern.hasMatch(p.originalName) &&
-              p.displayName.isNotEmpty;
-        })
-        .toList();
-    final popularDirectors = (await Future.wait(directorFutures))
-        .whereType<Person>()
-        .where((p) {
-          return koreanPattern.hasMatch(p.originalName) &&
-              p.displayName.isNotEmpty;
-        })
-        .toList();
+  static Future<List<Person>> _getPopularPeoplePages() {
+    return _popularPeoplePagesCache ??= _loadPopularPeoplePages();
+  }
 
-    return {'actors': popularActors, 'directors': popularDirectors};
+  static Future<List<Person>> _loadPopularPeoplePages() async {
+    const totalPages = 5; // 5페이지(100명)로 최적화하여 429 에러 방지 및 초고속 로딩
+    const batchSize = 5;
+    final pages = <List<Person>>[];
+
+    for (var start = 1; start <= totalPages; start += batchSize) {
+      final end = (start + batchSize - 1).clamp(1, totalPages);
+      final batch = await Future.wait(
+        List.generate(end - start + 1, (index) async {
+          final page = start + index;
+          final url = Uri.parse(
+            '$_baseUrl/person/popular?api_key=$_apiKey&language=ko-KR&page=$page',
+          );
+          final response = await http.get(url);
+          if (response.statusCode != 200) return <Person>[];
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final results = data['results'] as List<dynamic>? ?? [];
+          return results
+              .whereType<Map<String, dynamic>>()
+              .map(Person.fromJson)
+              .toList();
+        }),
+      );
+      pages.addAll(batch);
+    }
+
+    return pages.expand((page) => page).toList();
   }
 }

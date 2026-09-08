@@ -46,24 +46,32 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
 
   List<GenreItem> _buildGenreList() {
     return [
-      GenreItem(id: 'action',      label: '액션',      color: const Color(0xFFEF4444)),
-      GenreItem(id: 'adventure',   label: '모험',      color: const Color(0xFF3B82F6)),
-      GenreItem(id: 'animation',   label: '애니메이션', color: const Color(0xFF06B6D4)),
-      GenreItem(id: 'comedy',      label: '코미디',    color: const Color(0xFFF59E0B)),
-      GenreItem(id: 'crime',       label: '범죄',      color: const Color(0xFF8B5CF6)),
-      GenreItem(id: 'documentary', label: '다큐멘터리', color: const Color(0xFF6B7280)),
-      GenreItem(id: 'drama',       label: '드라마',    color: const Color(0xFF10B981)),
-      GenreItem(id: 'family',      label: '가족',      color: const Color(0xFFF97316)),
-      GenreItem(id: 'fantasy',     label: '판타지',    color: const Color(0xFF7C3AED)),
-      GenreItem(id: 'history',     label: '역사',      color: const Color(0xFF78716C)),
-      GenreItem(id: 'horror',      label: '공포',      color: const Color(0xFF1F2937)),
-      GenreItem(id: 'music',       label: '음악',      color: const Color(0xFFEC4899)),
-      GenreItem(id: 'mystery',     label: '미스터리',  color: const Color(0xFF374151)),
-      GenreItem(id: 'romance',     label: '로맨스',    color: const Color(0xFFF43F5E)),
-      GenreItem(id: 'sf',          label: 'SF',        color: const Color(0xFF0EA5E9)),
-      GenreItem(id: 'sports',      label: '스포츠',    color: const Color(0xFF22C55E)),
-      GenreItem(id: 'thriller',    label: '스릴러',    color: const Color(0xFF111827)),
-      GenreItem(id: 'war',         label: '전쟁',      color: const Color(0xFF4B5563)),
+      GenreItem(id: 'action', label: '액션', color: const Color(0xFFEF4444)),
+      GenreItem(id: 'adventure', label: '모험', color: const Color(0xFF3B82F6)),
+      GenreItem(
+        id: 'animation',
+        label: '애니메이션',
+        color: const Color(0xFF06B6D4),
+      ),
+      GenreItem(id: 'comedy', label: '코미디', color: const Color(0xFFF59E0B)),
+      GenreItem(id: 'crime', label: '범죄', color: const Color(0xFF8B5CF6)),
+      GenreItem(
+        id: 'documentary',
+        label: '다큐멘터리',
+        color: const Color(0xFF6B7280),
+      ),
+      GenreItem(id: 'drama', label: '드라마', color: const Color(0xFF10B981)),
+      GenreItem(id: 'family', label: '가족', color: const Color(0xFFF97316)),
+      GenreItem(id: 'fantasy', label: '판타지', color: const Color(0xFF7C3AED)),
+      GenreItem(id: 'history', label: '역사', color: const Color(0xFF78716C)),
+      GenreItem(id: 'horror', label: '공포', color: const Color(0xFF1F2937)),
+      GenreItem(id: 'music', label: '음악', color: const Color(0xFFEC4899)),
+      GenreItem(id: 'mystery', label: '미스터리', color: const Color(0xFF374151)),
+      GenreItem(id: 'romance', label: '로맨스', color: const Color(0xFFF43F5E)),
+      GenreItem(id: 'sf', label: 'SF', color: const Color(0xFF0EA5E9)),
+      GenreItem(id: 'sports', label: '스포츠', color: const Color(0xFF22C55E)),
+      GenreItem(id: 'thriller', label: '스릴러', color: const Color(0xFF111827)),
+      GenreItem(id: 'war', label: '전쟁', color: const Color(0xFF4B5563)),
     ];
   }
 
@@ -128,9 +136,12 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text(
                       '네',
@@ -160,11 +171,11 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
   }
 
   // [건너뛰기] 버튼: 안내 팝업 먼저 표시
-  
+
   Future<void> _saveAndNavigate() async {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const MainScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
   }
 
   void _onSkip() {
@@ -202,7 +213,10 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('user_mbti');
+                      if (!mounted || !dialogContext.mounted) return;
                       Navigator.of(dialogContext).pop();
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(builder: (_) => const MainScreen()),
@@ -210,8 +224,13 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text(
                       '네',
@@ -298,7 +317,8 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                         border: genre.isSelected
                             ? Border.all(
                                 color: genre.color.withValues(alpha: 0.8),
-                                width: 2)
+                                width: 2,
+                              )
                             : null,
                       ),
                       child: Stack(
@@ -319,8 +339,11 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                             const Positioned(
                               top: 8,
                               right: 8,
-                              child: Icon(Icons.check_circle,
-                                  color: Colors.white, size: 18),
+                              child: Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
                         ],
                       ),
@@ -342,7 +365,8 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                         side: const BorderSide(color: Colors.white30),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: const Text(
                         '건너뛰기',
@@ -359,7 +383,8 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                         backgroundColor: const Color(0xFF22C55E),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: const Text(
                         '확인',

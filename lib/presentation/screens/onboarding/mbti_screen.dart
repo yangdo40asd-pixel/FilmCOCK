@@ -1,4 +1,3 @@
-import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
 import 'package:flutter/material.dart';
 // 1. shared_preferences 패키지를 import
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,14 +23,25 @@ class _MbtiScreenState extends State<MbtiScreen> {
 
     if (mounted) {
       MbtiInfo mbtiInfo = const MbtiInfo(
-        id: 'NONE', title: '', description: '', feature: '', recommendedGenres: '', genreIds: [], famousPeople: [], svgAsset: ''
+        id: 'NONE',
+        title: '',
+        description: '',
+        feature: '',
+        recommendedGenres: '',
+        genreIds: [],
+        famousPeople: [],
+        svgAsset: '',
       );
-      if (mbtiToSave != null && mbtiToSave != 'skipped' && mbtiToSave != 'NONE') {
+      if (mbtiToSave != null &&
+          mbtiToSave != 'skipped' &&
+          mbtiToSave != 'NONE') {
         final found = getMbtiInfoById(mbtiToSave);
         if (found != null) mbtiInfo = found;
       }
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => GenreSelectScreen(mbtiInfo: mbtiInfo)),
+        MaterialPageRoute(
+          builder: (context) => GenreSelectScreen(mbtiInfo: mbtiInfo),
+        ),
       );
     }
   }
@@ -147,8 +157,8 @@ class _MbtiScreenState extends State<MbtiScreen> {
               // --- '건너뛰기' 버튼 수정 ---
               TextButton(
                 onPressed: () {
-                  // 8. 'skipped'라는 값을 저장 (다시 물어보지 않도록)
-                  _navigateToGenre(context, mbtiToSave: 'skipped');
+                  // 건너뛰기는 MBTI를 저장하지 않고 인기 영화 추천으로 진입한다.
+                  _navigateToGenre(context);
                 },
                 child: const Text(
                   '건너뛰기',

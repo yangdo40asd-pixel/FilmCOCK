@@ -5,26 +5,59 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
-import 'package:flutter/material.dart';
+import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:filmcock_app/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('Person display filtering', () {
+    test('accepts a Korean translated display name', () {
+      final person = Person(
+        id: 1,
+        name: '아만다 콜린',
+        originalName: 'Amanda Collin',
+        knownForDepartment: 'Acting',
+      );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(person.displayName, '아만다 콜린');
+      expect(person.hasKoreanDisplayName, isTrue);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('rejects an untranslated English display name', () {
+      final person = Person(
+        id: 2,
+        name: 'Genesis Rodriguez',
+        originalName: 'Genesis Rodriguez',
+        knownForDepartment: 'Acting',
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(person.hasKoreanDisplayName, isFalse);
+    });
+
+    test('rejects a Japanese display name', () {
+      final person = Person(
+        id: 3,
+        name: '佐々木麻由子',
+        originalName: '佐々木麻由子',
+        knownForDepartment: 'Acting',
+      );
+
+      expect(person.displayName, isEmpty);
+      expect(person.hasKoreanDisplayName, isFalse);
+    });
+  });
+
+  test('watch provider builds a TMDB logo URL', () {
+    const provider = WatchProvider(
+      providerId: 356,
+      providerName: 'wavve',
+      logoPath: '/provider.jpg',
+      link: 'https://www.themoviedb.org/movie/1/watch?locale=KR',
+      offerType: '구독',
+    );
+
+    expect(
+      provider.fullLogoUrl,
+      'https://image.tmdb.org/t/p/w200/provider.jpg',
+    );
   });
 }

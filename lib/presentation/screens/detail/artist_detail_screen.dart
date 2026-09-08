@@ -6,11 +6,13 @@ import 'package:filmcock_app/presentation/widgets/movie_poster.dart';
 class ArtistDetailScreen extends StatefulWidget {
   final int artistId;
   final String artistName;
+  final String? profileUrl;
 
   const ArtistDetailScreen({
     super.key,
     required this.artistId,
     required this.artistName,
+    this.profileUrl,
   });
 
   @override
@@ -23,8 +25,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // 위젯이 생성될 때 배우의 필모그래피를 API로 가져옵니다.
-    filmography = ApiService.getMovieCreditsForPerson(widget.artistId);
+    filmography = ApiService.getPersonFilmography(
+      widget.artistId,
+      directing: true,
+    );
   }
 
   @override
@@ -43,9 +47,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: Colors.grey[800],
-                backgroundImage: NetworkImage(
-                  'https://picsum.photos/id/${widget.artistId + 100}/200/200',
-                ),
+                backgroundImage: widget.profileUrl?.isNotEmpty == true
+                    ? NetworkImage(widget.profileUrl!)
+                    : null,
+                child: widget.profileUrl?.isNotEmpty == true
+                    ? null
+                    : const Icon(Icons.person, color: Colors.white70, size: 48),
               ),
               const SizedBox(height: 12),
 
@@ -59,15 +66,15 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               ),
               const SizedBox(height: 32),
 
-              // 4. '주요 작품들' 섹션 (PDF 5페이지 참고)
+              // 4. 주요 작품 섹션
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '주요 작품들',
+                  '주요 작품들이에요',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // 5. 작품들을 격자(Grid) 형태로 보여줌
               FutureBuilder<List<Movie>>(

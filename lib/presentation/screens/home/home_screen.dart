@@ -1,6 +1,7 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:filmcock_app/data/services/api_service.dart';
+import 'package:filmcock_app/data/services/home_prefetch_service.dart';
 import 'package:filmcock_app/presentation/widgets/section_header.dart';
 import 'package:filmcock_app/presentation/screens/home/list_view_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
@@ -32,61 +33,71 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<Person>>? popularKoreanDirectors;
 
   String _userMbti = '추천영화'; // 기본값
+  bool _isHomeReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMbti();
+    final cachedData = HomePrefetchService.cachedData;
+    if (cachedData != null) {
+      _applyHomeData(cachedData);
+      _isHomeReady = true;
+      _loadMbti();
+    } else {
+      _prepareHome();
+    }
+  }
 
-    // API 데이터 Fetch
-    popularMovies = ApiService.getPopularMovies();
-    randomMovies = _loadRandomMovies(); // 임시로 Popular + Shuffle 사용
-    upcomingMovies = ApiService.getUpcomingMovies();
-    nowPlayingMovies = ApiService.getNowPlayingMovies();
-    animationMovies = ApiService.getMoviesByGenre(16); // 애니메이션
-    topRatedMovies = ApiService.getClassicMovies();
+  Future<void> _prepareHome() async {
+    try {
+      final data = await HomePrefetchService.load();
+      _applyHomeData(data);
+      final prefs = await SharedPreferences.getInstance();
+      _userMbti = prefs.getString('user_mbti') ?? '추천영화';
+    } catch (_) {
+      popularMovies = Future.value(const []);
+      randomMovies = Future.value(const []);
+      upcomingMovies = Future.value(const []);
+      nowPlayingMovies = Future.value(const []);
+      animationMovies = Future.value(const []);
+      topRatedMovies = Future.value(const []);
+      popularForeignActors = Future.value(const []);
+      popularKoreanActors = Future.value(const []);
+      popularKoreanDirectors = Future.value(const []);
+    } finally {
+      if (mounted) setState(() => _isHomeReady = true);
+    }
+  }
 
-    // 인물 데이터 Fetch
-    _loadKoficPeople();
-    popularForeignActors =
-        ApiService.getPopularPeople(); // 해외 배우 (TMDB 인기 인물 기반)
+  void _applyHomeData(HomePrefetchData data) {
+    popularMovies = Future.value(data.popularMovies);
+    randomMovies = Future.value(data.randomMovies);
+    upcomingMovies = Future.value(data.upcomingMovies);
+    nowPlayingMovies = Future.value(data.nowPlayingMovies);
+    animationMovies = Future.value(data.animationMovies);
+    topRatedMovies = Future.value(data.classicMovies);
+    popularForeignActors = Future.value(data.foreignActors);
+    popularKoreanActors = Future.value(data.koreanActors);
+    popularKoreanDirectors = Future.value(data.koreanDirectors);
   }
 
   Future<void> _loadMbti() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _userMbti = prefs.getString('user_mbti') ?? '추천영화';
-    });
-  }
-
-  Future<List<Movie>> _loadRandomMovies() async {
-    final movies = await ApiService.getPopularMovies();
-    movies.shuffle(Random());
-    return movies;
-  }
-
-  void _loadKoficPeople() async {
-    // KOFIC API를 통해 한국 배우와 감독 목록 추출
-    try {
-      final peopleMap = await ApiService.getPopularPeopleFromKofic();
-      if (mounted) {
-        setState(() {
-          popularKoreanActors = Future.value(peopleMap['actors']);
-          popularKoreanDirectors = Future.value(peopleMap['directors']);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          popularKoreanActors = Future.value([]);
-          popularKoreanDirectors = Future.value([]);
-        });
-      }
-    }
+    if (!mounted) return;
+    setState(() => _userMbti = prefs.getString('user_mbti') ?? '추천영화');
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!_isHomeReady) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1E1E2E),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2E), // 배경 다크 테마 컬러 통일
       appBar: AppBar(
@@ -680,6 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? ArtistDetailScreen(
                             artistId: person.id,
                             artistName: person.displayName,
+                            profileUrl: person.fullProfileUrl,
                           )
                         : ActorDetailScreen(actor: person),
                   ),

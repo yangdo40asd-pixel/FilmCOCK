@@ -88,6 +88,7 @@ class ListViewScreen extends StatelessWidget {
                 ? ArtistDetailScreen(
                     artistId: person.id,
                     artistName: person.displayName,
+                    profileUrl: person.fullProfileUrl,
                   )
                 : ActorDetailScreen(actor: person),
           ),
