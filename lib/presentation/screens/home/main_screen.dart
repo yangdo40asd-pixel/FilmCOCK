@@ -31,12 +31,16 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Center(
         child: _widgetOptions.elementAt(_selectedIndex), // 선택된 탭에 맞는 화면을 보여줌
       ),
       bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(canvasColor: const Color(0xFF303030)),
+        data: Theme.of(context).copyWith(
+          canvasColor: isDark ? const Color(0xFF1F1F1F) : Colors.white,
+        ),
         child: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
@@ -45,8 +49,8 @@ class _MainScreenState extends State<MainScreen> {
             BottomNavigationBarItem(icon: Icon(Icons.person), label: '마이페이지'),
           ],
           currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF55C75A),
-          unselectedItemColor: Colors.grey[600],
+          selectedItemColor: const Color(0xFF6A5ACD),
+          unselectedItemColor: isDark ? Colors.grey[500] : Colors.grey[600],
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,

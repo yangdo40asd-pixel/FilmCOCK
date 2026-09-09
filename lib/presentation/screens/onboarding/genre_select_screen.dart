@@ -24,7 +24,13 @@ class GenreItem {
 // ============================================================
 class GenreSelectScreen extends StatefulWidget {
   final MbtiInfo mbtiInfo;
-  const GenreSelectScreen({super.key, required this.mbtiInfo});
+  final bool isResetMode;
+
+  const GenreSelectScreen({
+    super.key,
+    required this.mbtiInfo,
+    this.isResetMode = false,
+  });
 
   @override
   State<GenreSelectScreen> createState() => _GenreSelectScreenState();
@@ -37,11 +43,25 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
   void initState() {
     super.initState();
     _genres = _buildGenreList();
-    for (final genre in _genres) {
-      if (widget.mbtiInfo.genreIds.contains(genre.id)) {
-        genre.isSelected = true;
+    _loadInitialSelections();
+  }
+
+  Future<void> _loadInitialSelections() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedGenres = prefs.getStringList('user_genres');
+
+    if (!mounted) return;
+    setState(() {
+      for (final genre in _genres) {
+        if (savedGenres != null && savedGenres.isNotEmpty) {
+          if (savedGenres.contains(genre.id)) {
+            genre.isSelected = true;
+          }
+        } else if (widget.mbtiInfo.genreIds.contains(genre.id)) {
+          genre.isSelected = true;
+        }
       }
-    }
+    });
   }
 
   List<GenreItem> _buildGenreList() {
@@ -173,9 +193,18 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
   // [건너뛰기] 버튼: 안내 팝업 먼저 표시
 
   Future<void> _saveAndNavigate() async {
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
+    final prefs = await SharedPreferences.getInstance();
+    final selectedIds = _selectedGenres.map((g) => g.id).toList();
+    await prefs.setStringList('user_genres', selectedIds);
+
+    if (!mounted) return;
+    if (widget.isResetMode && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    }
   }
 
   void _onSkip() {

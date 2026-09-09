@@ -1,6 +1,9 @@
+import 'package:filmcock_app/core/utils/hangul_utils.dart';
+import 'package:filmcock_app/data/models/search_suggestion.dart';
+import 'package:filmcock_app/data/dummy/korean_people_data.dart';
+import 'package:filmcock_app/data/services/home_prefetch_service.dart';
 import 'dart:convert';
 import 'package:filmcock_app/data/models/movie_model.dart';
-import 'package:filmcock_app/data/dummy/korean_people_data.dart';
 import 'package:filmcock_app/core/config/secrets.dart';
 import 'package:filmcock_app/core/utils/language_filter.dart';
 import 'package:http/http.dart' as http;
@@ -585,4 +588,140 @@ class ApiService {
 
     return pages.expand((page) => page).toList();
   }
+
+  // ============================================================
+  // 초성 및 키워드 통합 추천 검색어 (영화 & 인물)
+  // ============================================================
+  static Future<List<SearchSuggestion>> getSearchSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+
+    final suggestions = <SearchSuggestion>[];
+    final seenKeys = <String>{};
+
+    final isChosung = HangulUtils.isChosungOnly(trimmed);
+
+    // 1. 캐시된 로컬 영화 목록에서 초성/키워드 매칭
+    final cached = HomePrefetchService.cachedData;
+    final allLocalMovies = <Movie>[];
+    if (cached != null) {
+      allLocalMovies.addAll(cached.popularMovies);
+      allLocalMovies.addAll(cached.nowPlayingMovies);
+      allLocalMovies.addAll(cached.upcomingMovies);
+      allLocalMovies.addAll(cached.animationMovies);
+      allLocalMovies.addAll(cached.classicMovies);
+    }
+
+    for (final movie in allLocalMovies) {
+      if (HangulUtils.matches(movie.title, trimmed)) {
+        final key = 'm_${movie.title}';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          suggestions.add(SearchSuggestion(
+            id: movie.id,
+            title: movie.title,
+            type: SuggestionType.movie,
+            imageUrl: movie.fullPosterUrl.isNotEmpty ? movie.fullPosterUrl : null,
+            movie: movie,
+          ));
+        }
+      }
+      if (suggestions.length >= 8) break;
+    }
+
+    // 2. 로컬 한국 배우 및 유명 감독 DB에서 초성/키워드 매칭 (2,776명 + 225명)
+    for (final person in KoreanPeopleData.masterActors) {
+      if (HangulUtils.matches(person.name, trimmed)) {
+        final key = 'p_${person.name}';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          suggestions.add(SearchSuggestion(
+            id: person.id,
+            title: person.name,
+            type: SuggestionType.person,
+            imageUrl: person.fullProfileUrl.isNotEmpty ? person.fullProfileUrl : null,
+            person: person,
+          ));
+        }
+      }
+      if (suggestions.length >= 15) break;
+    }
+
+    for (final director in KoreanPeopleData.masterDirectors) {
+      if (HangulUtils.matches(director.name, trimmed)) {
+        final key = 'p_${director.name}';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          suggestions.add(SearchSuggestion(
+            id: director.id,
+            title: director.name,
+            type: SuggestionType.person,
+            imageUrl: director.fullProfileUrl.isNotEmpty ? director.fullProfileUrl : null,
+            person: director,
+          ));
+        }
+      }
+      if (suggestions.length >= 20) break;
+    }
+
+    // 3. 순수 초성이 아닌 일반 텍스트인 경우 TMDB 실시간 multi search 추가 조회
+    if (!isChosung) {
+      try {
+        final url = Uri.parse(
+          '$_baseUrl/search/multi?api_key=$_apiKey&language=ko-KR&query=${Uri.encodeComponent(trimmed)}&page=1',
+        );
+        final response = await http.get(url);
+        if (response.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          final List<dynamic> results = data['results'] ?? [];
+
+          for (final item in results) {
+            final mediaType = item['media_type'];
+            final id = item['id'] as int;
+
+            if (mediaType == 'movie') {
+              final title = item['title'] as String? ?? '';
+              final key = 'm_$title';
+              if (title.isNotEmpty && !seenKeys.contains(key)) {
+                seenKeys.add(key);
+                final posterPath = item['poster_path'] as String?;
+                final movie = Movie.fromJson(item as Map<String, dynamic>);
+                suggestions.add(SearchSuggestion(
+                  id: id,
+                  title: title,
+                  type: SuggestionType.movie,
+                  imageUrl: posterPath != null
+                      ? 'https://image.tmdb.org/t/p/w500$posterPath'
+                      : null,
+                  movie: movie,
+                ));
+              }
+            } else if (mediaType == 'person') {
+              final name = item['name'] as String? ?? '';
+              final key = 'p_$name';
+              if (name.isNotEmpty && !seenKeys.contains(key)) {
+                seenKeys.add(key);
+                final profilePath = item['profile_path'] as String?;
+                final person = Person.fromJson(item as Map<String, dynamic>);
+                suggestions.add(SearchSuggestion(
+                  id: id,
+                  title: name,
+                  type: SuggestionType.person,
+                  imageUrl: profilePath != null
+                      ? 'https://image.tmdb.org/t/p/w500$profilePath'
+                      : null,
+                  person: person,
+                ));
+              }
+            }
+
+            if (suggestions.length >= 20) break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return suggestions.take(15).toList();
+  }
+
 }

@@ -5,7 +5,7 @@ import 'package:filmcock_app/presentation/screens/onboarding/mbti_panel_screen.d
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================================
-// MBTI 시작 화면 (안내 팝업 + 흔백 배경)
+// MBTI 선택 시작 화면 (안내 팝업 + 선택하기 / 건너뛰기)
 // ============================================================
 class MbtiSelectScreen extends StatefulWidget {
   const MbtiSelectScreen({super.key});
@@ -17,7 +17,7 @@ class MbtiSelectScreen extends StatefulWidget {
 class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
   bool _showPopup = true;
 
-  // [건너뛰기] 버튼: 안내 팝업 먼저
+  // [건너뛰기] 버튼 클릭 시 확인 다이얼로그
   void _onSkip() {
     showDialog(
       context: context,
@@ -41,7 +41,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                '(선호장르 화면으로 넘어갑니다)',
+                '(선호 장르 화면으로 넘어갑니다)',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.white70,
@@ -98,7 +98,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     child: const Text(
-                      '아니요',
+                      '아니오',
                       style: TextStyle(color: Colors.white54, fontSize: 16),
                     ),
                   ),
@@ -118,67 +118,90 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
       body: Stack(
         children: [
           SafeArea(
-            child: Column(
-              children: [
-                const SizedBox(height: 120),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Image.asset(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                children: [
+                  const Spacer(flex: 2),
+                  // 상단 MBTI 캐릭터 일러스트
+                  Image.asset(
                     'assets/images/mbti.png',
                     fit: BoxFit.contain,
                   ),
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => MbtiPanelScreen(),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF32285E),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            '선택하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white54,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: _onSkip,
-                        child: const Text(
-                          '건너뛰기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
+                  const SizedBox(height: 48),
+                  // 메인 타이틀
+                  const Text(
+                    '16가지 성격 유형에 따라\n나의 영화를 추천해드려요!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      height: 1.35,
+                      letterSpacing: -0.5,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  // 서브 타이틀
+                  const Text(
+                    '당신의 MBTI를 선택하여\n취향에 맞는 영화를 찾아보세요',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Color(0xFF757575),
+                      height: 1.5,
+                    ),
+                  ),
+                  const Spacer(flex: 3),
+                  // 하단 선택하기 버튼
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const MbtiPanelScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6356E5),
+                        elevation: 4,
+                        shadowColor: const Color(0xFF6356E5).withValues(alpha: 0.35),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        '선택하기',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // 건너뛰기 버튼
+                  TextButton(
+                    onPressed: _onSkip,
+                    child: const Text(
+                      '건너뛰기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF9E9E9E),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
+          // 첫 진입 시 안내 팝업
           if (_showPopup)
             Container(
               color: Colors.black.withValues(alpha: 0.55),
@@ -199,7 +222,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text(
-                          'MBTI 기반 영화 추천',
+                          'MBTI 맞춤 영화 추천',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -208,7 +231,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          '16가지 성격 유형에 따라\n나에게 딱 맞는 영화를 추천해드려요!',
+                          '16가지 성격 유형에 따라\n나의 취향에 맞는 영화를 추천해드려요!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 15,

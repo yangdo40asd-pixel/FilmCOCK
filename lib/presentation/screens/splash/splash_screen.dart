@@ -19,16 +19,11 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // 1. 최소 스플래시 노출 시간 보장 (2초) - UI/UX 개선
     final minimumDelay = Future.delayed(const Duration(seconds: 2));
-
-    // 홈에서 사용할 영화·인물 데이터를 모두 준비한 뒤 다음 화면으로 이동한다.
     await Future.wait([minimumDelay, HomePrefetchService.load()]);
 
     if (!mounted) return;
 
-    // 3. 네비게이션 처리
-    // 사용자 요청 흐름에 따라 처음에는 항상 로그인 화면으로 진입하도록 설정
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
@@ -39,7 +34,21 @@ class _SplashScreenState extends State<SplashScreen> {
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
-        children: [Image.asset('assets/images/start.jpeg', fit: BoxFit.cover)],
+        children: [
+          Image.asset('assets/images/start.jpeg', fit: BoxFit.cover),
+          // Animated loading indicator placed under the neon circle / clapper
+          const Align(
+            alignment: Alignment(0, 0.74),
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: CircularProgressIndicator(
+                strokeWidth: 3.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

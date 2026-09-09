@@ -14,6 +14,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
@@ -21,11 +22,10 @@ class SectionHeader extends StatelessWidget {
         children: [
           Text(
             '$title $emoji',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
-              // fontFamily: 'NotoSans' 는 AppTheme에서 전역으로 적용되므로 생략 가능
+              color: isDark ? Colors.white : const Color(0xFF191919),
             ),
           ),
           TextButton(
@@ -34,7 +34,6 @@ class SectionHeader extends StatelessWidget {
               '목록 보기 >',
               style: TextStyle(
                 color: Color(0xFF6A5ACD), // 보라색
-                // fontFamily: 'NotoSans' 는 AppTheme에서 전역으로 적용되므로 생략 가능
               ),
             ),
           ),

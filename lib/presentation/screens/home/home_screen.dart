@@ -1,3 +1,5 @@
+import 'package:filmcock_app/presentation/screens/chat/chat_screen.dart';
+import 'package:filmcock_app/core/theme/theme_controller.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -8,6 +10,7 @@ import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dar
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +22,226 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static bool _hasShownUpcomingAlert = false;
+
+  Future<void> _checkAndShowUpcomingAlert() async {
+    if (_hasShownUpcomingAlert) return;
+    _hasShownUpcomingAlert = true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final allPush = prefs.getBool('setting_all_push') ?? true;
+    final upcomingAlarm =
+        prefs.getBool('setting_upcoming_movie_alarm') ?? true;
+    if (!allPush || !upcomingAlarm) return;
+
+    try {
+      final movies = await upcomingMovies;
+      if (movies.isEmpty || !mounted) return;
+
+      // Find upcoming movie with poster
+      final movie = movies.firstWhere(
+        (m) => m.fullPosterUrl.isNotEmpty,
+        orElse: () => movies.first,
+      );
+
+      // Calculate D-day
+      String dDayText = 'D-1';
+      if (movie.releaseDate.isNotEmpty) {
+        try {
+          final release = DateTime.parse(movie.releaseDate);
+          final now = DateTime.now();
+          final diff = DateTime(release.year, release.month, release.day)
+              .difference(DateTime(now.year, now.month, now.day))
+              .inDays;
+          if (diff == 0) {
+            dDayText = 'D-Day';
+          } else if (diff > 0) {
+            dDayText = 'D-$diff';
+          } else {
+            dDayText = '개봉임박';
+          }
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+      _showUpcomingDialog(movie, dDayText);
+    } catch (_) {}
+  }
+
+  void _showUpcomingDialog(Movie movie, String dDayText) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: const Color(0xFF222226),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24.0),
+          ),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Circular Bell Icon Badge
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF735BF2),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.notifications,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Dialog Title
+                const Text(
+                  '곧 개봉해요!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Movie Poster
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16.0),
+                  child: SizedBox(
+                    width: 170,
+                    height: 240,
+                    child: movie.fullPosterUrl.isNotEmpty
+                        ? Image.network(
+                            movie.fullPosterUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => Container(
+                              color: Colors.grey[800],
+                              child: const Icon(
+                                Icons.movie,
+                                color: Colors.white54,
+                                size: 40,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            color: Colors.grey[800],
+                            child: const Icon(
+                              Icons.movie,
+                              color: Colors.white54,
+                              size: 40,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Movie Title
+                Text(
+                  movie.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 12),
+
+                // Red D-day Pill Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 6.0,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF3B30),
+                    borderRadius: BorderRadius.circular(20.0),
+                  ),
+                  child: Text(
+                    dDayText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 26),
+
+                // Action Buttons (닫기 & 상세보기)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text(
+                          '닫기',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6B4EE6),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MovieDetailScreen(movie: movie),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          '상세보기',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // 배너 및 일반 영화
   late Future<List<Movie>> popularMovies;
   late Future<List<Movie>> randomMovies;
@@ -43,6 +266,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _applyHomeData(cachedData);
       _isHomeReady = true;
       _loadMbti();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkAndShowUpcomingAlert();
+      });
     } else {
       _prepareHome();
     }
@@ -65,7 +291,12 @@ class _HomeScreenState extends State<HomeScreen> {
       popularKoreanActors = Future.value(const []);
       popularKoreanDirectors = Future.value(const []);
     } finally {
-      if (mounted) setState(() => _isHomeReady = true);
+      if (mounted) {
+        setState(() => _isHomeReady = true);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkAndShowUpcomingAlert();
+        });
+      }
     }
   }
 
@@ -98,21 +329,25 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF7F7FA);
+    final titleColor = isDark ? Colors.white : const Color(0xFF191919);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2E), // 배경 다크 테마 컬러 통일
+      backgroundColor: bgColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: const Color(0xFF1E1E2E),
+        backgroundColor: bgColor,
         elevation: 0,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset('assets/images/1.png', height: 32),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               'FilmCOCK!',
               style: TextStyle(
-                color: Colors.white,
+                color: titleColor,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 fontStyle: FontStyle.italic,
@@ -121,17 +356,32 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.nightlight_round, color: Colors.white),
-            onPressed: () {
-              // 다크/라이트 토글 - 아직 기능 없음
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: ThemeController.themeMode,
+            builder: (context, mode, _) {
+              final isCurrentDark = mode == ThemeMode.dark;
+              return IconButton(
+                icon: Icon(
+                  isCurrentDark ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+                  color: isCurrentDark ? Colors.white : const Color(0xFFF59E0B),
+                ),
+                tooltip: isCurrentDark ? '라이트 모드로 전환' : '다크 모드로 전환',
+                onPressed: () {
+                  ThemeController.toggleTheme();
+                },
+              );
             },
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // 말풍선 채팅 기능
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ChatScreen(),
+            ),
+          );
         },
         backgroundColor: const Color(0xFF8B5CF6),
         child: const Icon(Icons.chat_bubble, color: Colors.white),
@@ -160,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 emoji: '🍿',
                 onTap: () async {
                   final movies = await randomMovies;
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -187,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 emoji: '📅',
                 onTap: () async {
                   final movies = await upcomingMovies;
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -214,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 emoji: '📽️',
                 onTap: () async {
                   final movies = await nowPlayingMovies;
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -241,7 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 emoji: '🦄',
                 onTap: () async {
                   final movies = await animationMovies;
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -268,7 +518,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 emoji: '👍',
                 onTap: () async {
                   final movies = await topRatedMovies;
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -293,11 +543,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SectionHeader(
                 title: '한국 배우',
                 emoji: '🇰🇷',
-                onTap: () {
-                  popularKoreanActors?.then((actors) {
-                    if (actors.isNotEmpty)
-                      _navigateToListScreen(context, '한국 배우', actors);
-                  });
+                onTap: () async {
+                  final actors = await popularKoreanActors;
+                  if (!context.mounted) return;
+                  if (actors != null && actors.isNotEmpty) {
+                    _navigateToListScreen(context, '한국 배우', actors);
+                  }
                 },
               ),
             ),
@@ -315,11 +566,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SectionHeader(
                 title: '해외 배우',
                 emoji: '🌟',
-                onTap: () {
-                  popularForeignActors.then((actors) {
-                    if (actors.isNotEmpty)
-                      _navigateToListScreen(context, '해외 배우', actors);
-                  });
+                onTap: () async {
+                  final actors = await popularForeignActors;
+                  if (!context.mounted) return;
+                  if (actors.isNotEmpty) {
+                    _navigateToListScreen(context, '해외 배우', actors);
+                  }
                 },
               ),
             ),
@@ -337,11 +589,12 @@ class _HomeScreenState extends State<HomeScreen> {
               child: SectionHeader(
                 title: '유명 감독',
                 emoji: '🎬',
-                onTap: () {
-                  popularKoreanDirectors?.then((directors) {
-                    if (directors.isNotEmpty)
-                      _navigateToListScreen(context, '유명 감독', directors);
-                  });
+                onTap: () async {
+                  final directors = await popularKoreanDirectors;
+                  if (!context.mounted) return;
+                  if (directors != null && directors.isNotEmpty) {
+                    _navigateToListScreen(context, '유명 감독', directors);
+                  }
                 },
               ),
             ),
@@ -371,6 +624,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12.0),
             _buildReviewChannelList(),
+            const SizedBox(height: 20.0),
+            _buildKoficBanner(context),
 
             const SizedBox(height: 40.0),
           ],
@@ -471,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(0.9), Colors.transparent],
+                    colors: [Colors.black.withValues(alpha: 0.9), Colors.transparent],
                   ),
                 ),
               ),
@@ -558,9 +813,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8.0),
                     Text(
                       movie.title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF191919),
                         fontSize: 12.0,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -593,7 +851,7 @@ class _HomeScreenState extends State<HomeScreen> {
               final release = DateTime.parse(movie.releaseDate);
               dDay = release.difference(DateTime.now()).inDays;
             }
-          } catch (e) {}
+          } catch (_) {}
 
           return Padding(
             padding: const EdgeInsets.only(right: 12.0),
@@ -651,9 +909,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8.0),
                     Text(
                       movie.title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF191919),
                         fontSize: 12.0,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -712,6 +973,143 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 8.0),
                     Text(
                       person.displayName,
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF191919),
+                        fontSize: 12.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReviewChannelList() {
+    final channels = [
+      ReviewChannel(
+        name: '단군',
+        logoAsset: 'assets/images/dangun.png',
+        youtubeUrl: 'https://www.youtube.com/@kimdangun',
+      ),
+      ReviewChannel(
+        name: '리뷰마스터',
+        logoAsset: 'assets/images/review_master.jpg',
+        youtubeUrl: 'https://www.youtube.com/@review.master',
+      ),
+      ReviewChannel(
+        name: '지무비',
+        logoAsset: 'assets/images/gmovie.webp',
+        youtubeUrl: 'https://www.youtube.com/@gmovie',
+      ),
+      ReviewChannel(
+        name: '고몽',
+        logoAsset: 'assets/images/gomong.png',
+        youtubeUrl: 'https://www.youtube.com/@gomong',
+      ),
+      ReviewChannel(
+        name: '김시선',
+        logoAsset: 'assets/images/siseon.webp',
+        youtubeUrl: 'https://www.youtube.com/@siseon',
+      ),
+      ReviewChannel(
+        name: '달빛뮤즈',
+        logoAsset: 'assets/images/moonlightmuse.webp',
+        youtubeUrl: 'https://www.youtube.com/@moonlightmuse',
+      ),
+      ReviewChannel(
+        name: '삐맨',
+        logoAsset: 'assets/images/bman.webp',
+        youtubeUrl: 'https://www.youtube.com/@BMan',
+      ),
+    ];
+
+    final fallbackColors = [
+      Colors.deepOrange,
+      Colors.amber,
+      Colors.blue,
+      Colors.green,
+      Colors.purple,
+      Colors.teal,
+    ];
+
+    return SizedBox(
+      height: 120.0,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        itemCount: channels.length,
+        itemBuilder: (context, index) {
+          final channel = channels[index];
+          final fallbackColor = fallbackColors[index % fallbackColors.length];
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: GestureDetector(
+              onTap: () async {
+                if (channel.youtubeUrl.isNotEmpty) {
+                  final uri = Uri.parse(channel.youtubeUrl);
+                  try {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } catch (_) {
+                    await launchUrl(uri, mode: LaunchMode.platformDefault);
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('리뷰 채널 링크를 준비 중입니다.')),
+                  );
+                }
+              },
+              child: SizedBox(
+                width: 90.0,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16.0),
+                        child: channel.logoAsset != null
+                            ? Image.asset(
+                                channel.logoAsset!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                  width: double.infinity,
+                                  color: fallbackColor,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.play_circle_fill,
+                                      size: 40,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                width: double.infinity,
+                                color: fallbackColor,
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.play_circle_fill,
+                                    size: 40,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 8.0),
+                    Text(
+                      channel.name,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12.0,
@@ -729,66 +1127,87 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildReviewChannelList() {
-    final channels = [
-      {'name': '지무비', 'color': Colors.amber},
-      {'name': '고몽', 'color': Colors.blue},
-      {'name': '김시선', 'color': Colors.green},
-      {'name': '달빛뮤즈', 'color': Colors.purple},
-    ];
-
-    return SizedBox(
-      height: 120.0,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: channels.length,
-        itemBuilder: (context, index) {
-          final channel = channels[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('리뷰 영상은 준비 중입니다.')),
-                );
-              },
-              child: SizedBox(
-                width: 90.0,
+  Widget _buildKoficBanner(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: InkWell(
+        onTap: () async {
+          final uri = Uri.parse('https://www.kobis.or.kr');
+          try {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } catch (_) {
+            await launchUrl(uri, mode: LaunchMode.platformDefault);
+          }
+        },
+        borderRadius: BorderRadius.circular(16.0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF282932)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16.0),
+            border: Theme.of(context).brightness == Brightness.dark
+                ? Border.all(color: Colors.white12)
+                : Border.all(color: Colors.black12),
+          ),
+          child: Row(
+            children: [
+              // 영화 슬레이트 아이콘
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.movie_creation_outlined,
+                    color: Colors.white70,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14.0),
+              // 중앙 KOFIC 및 영화진흥위원회 텍스트
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16.0),
-                        child: Container(
-                          width: double.infinity,
-                          color: channel['color'] as Color,
-                          child: const Center(
-                            child: Icon(
-                              Icons.play_circle_fill,
-                              size: 40,
-                              color: Colors.white54,
-                            ),
-                          ),
-                        ),
+                    const Text(
+                      'KOFIC',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 8.0),
+                    const SizedBox(height: 4.0),
                     Text(
-                      channel['name'] as String,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.0,
+                      '영화진흥위원회',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 13.0,
                       ),
-                      maxLines: 1,
                     ),
                   ],
                 ),
               ),
-            ),
-          );
-        },
+              // 우측 보라색 버튼
+              // 외부 링크 안내 아이콘
+              const Icon(
+                Icons.open_in_new_rounded,
+                color: Colors.white54,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
 }

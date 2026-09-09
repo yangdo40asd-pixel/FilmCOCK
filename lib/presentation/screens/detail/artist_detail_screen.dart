@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/widgets/movie_poster.dart';
@@ -21,6 +23,7 @@ class ArtistDetailScreen extends StatefulWidget {
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   late Future<List<Movie>> filmography;
+  bool _isLiked = false;
 
   @override
   void initState() {
@@ -29,13 +32,76 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
       widget.artistId,
       directing: true,
     );
+    _loadLikeState();
+  }
+
+  Future<void> _loadLikeState() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLiked = prefs.getBool('liked_person_${widget.artistId}') ?? false;
+    });
+  }
+
+  Future<void> _toggleLike() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nextState = !_isLiked;
+    setState(() {
+      _isLiked = nextState;
+    });
+    await prefs.setBool('liked_person_${widget.artistId}', nextState);
+
+    final rawList = prefs.getStringList('liked_people') ?? [];
+    List<Map<String, dynamic>> people = rawList.map((e) {
+      try {
+        return jsonDecode(e) as Map<String, dynamic>;
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }).where((m) => m.isNotEmpty).toList();
+
+    people.removeWhere((p) => p['id'].toString() == widget.artistId.toString());
+    if (nextState) {
+      people.insert(0, {
+        'id': widget.artistId,
+        'name': widget.artistName,
+        'profileUrl': widget.profileUrl ?? '',
+        'department': '감독',
+      });
+    }
+    await prefs.setStringList(
+      'liked_people',
+      people.map((e) => jsonEncode(e)).toList(),
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nextState ? '💖 좋아요한 인물에 추가되었습니다.' : '좋아요가 취소되었습니다.',
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1E1E1E),
       appBar: AppBar(
-        title: Text(widget.artistName), // 앱 바에 아티스트 이름 표시
+        backgroundColor: const Color(0xFF1E1E1E),
+        elevation: 0,
+        title: Text(widget.artistName),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _isLiked ? Icons.favorite : Icons.favorite_border,
+              color: _isLiked ? const Color(0xFFFF4D4F) : Colors.white,
+            ),
+            onPressed: _toggleLike,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -43,7 +109,6 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 2. 아티스트 프로필 사진 (PDF 5페이지 참고)
               CircleAvatar(
                 radius: 60,
                 backgroundColor: Colors.grey[800],
@@ -55,28 +120,27 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     : const Icon(Icons.person, color: Colors.white70, size: 48),
               ),
               const SizedBox(height: 12),
-
-              // 3. 아티스트 이름
               Text(
                 widget.artistName,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 32),
-
-              // 4. 주요 작품 섹션
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '주요 작품들이에요',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // 5. 작품들을 격자(Grid) 형태로 보여줌
+              const SizedBox(height: 12),
               FutureBuilder<List<Movie>>(
                 future: filmography,
                 builder: (context, snapshot) {
@@ -84,7 +148,12 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError || !snapshot.hasData) {
-                    return const Center(child: Text('작품 정보를 불러올 수 없습니다.'));
+                    return const Center(
+                      child: Text(
+                        '작품 정보를 불러올 수 없습니다.',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    );
                   }
                   final movies = snapshot.data!;
                   return GridView.builder(
@@ -94,7 +163,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
-                          childAspectRatio: (130 / 190), // 포스터 비율
+                          childAspectRatio: (130 / 190),
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
                         ),

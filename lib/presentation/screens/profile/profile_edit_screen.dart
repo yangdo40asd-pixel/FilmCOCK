@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -10,111 +11,265 @@ class ProfileEditScreen extends StatefulWidget {
 }
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
-  File? _imageFile;
+  final TextEditingController _nicknameController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickImage() async {
-    final XFile? pickedFile = await _picker.pickImage(
-      source: ImageSource.gallery,
-    );
+  File? _imageFile;
+  String? _savedImagePath;
+  bool _isLoading = true;
 
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nickname = prefs.getString('user_nickname') ?? '영화 매니아';
+    final bio = prefs.getString('user_bio') ?? '영화와 함께하는 일상!';
+    final imagePath = prefs.getString('user_profile_image');
+
+    setState(() {
+      _nicknameController.text = nickname;
+      _bioController.text = bio;
+      _savedImagePath = imagePath;
+      if (imagePath != null && imagePath.isNotEmpty && File(imagePath).existsSync()) {
+        _imageFile = File(imagePath);
+      }
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _imageFile = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('이미지를 불러오지 못했습니다: ')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    final nickname = _nicknameController.text.trim();
+    final bio = _bioController.text.trim();
+
+    if (nickname.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('닉네임을 입력해주세요.')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_nickname', nickname);
+    await prefs.setString('user_bio', bio);
+
+    if (_imageFile != null) {
+      await prefs.setString('user_profile_image', _imageFile!.path);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('프로필이 저장되었습니다.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop(true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF141414),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
+        ),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: const Color(0xFF141414),
       appBar: AppBar(
-        title: const Text('프로필 수정'),
+        backgroundColor: const Color(0xFF141414),
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          '프로필 수정',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              // TODO: 변경된 프로필 정보 저장 로직
-              Navigator.of(context).pop(); // 저장 후 이전 화면으로 돌아가기
-            },
+            onPressed: _saveProfile,
             child: const Text(
               '저장',
-              style: TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(
+                color: Color(0xFFA88BFA),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.grey,
-                backgroundImage: _imageFile != null
-                    ? FileImage(_imageFile!)
-                    : null,
-                child: _imageFile == null
-                    ? const Icon(Icons.person, size: 70, color: Colors.white)
-                    : null,
+              // Avatar
+              Center(
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: Colors.white24, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: _imageFile != null
+                        ? Image.file(
+                            _imageFile!,
+                            width: 110,
+                            height: 110,
+                            fit: BoxFit.cover,
+                          )
+                        : (_savedImagePath != null &&
+                                _savedImagePath!.isNotEmpty &&
+                                File(_savedImagePath!).existsSync())
+                            ? Image.file(
+                                File(_savedImagePath!),
+                                width: 110,
+                                height: 110,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.asset(
+                                'assets/images/popcorn_logo.png',
+                                width: 110,
+                                height: 110,
+                                fit: BoxFit.contain,
+                                errorBuilder: (ctx, err, stack) => const Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: Color(0xFF8B5CF6),
+                                ),
+                              ),
+                  ),
+                ),
               ),
+              const SizedBox(height: 10),
+              // Image Change Button
               TextButton(
-                onPressed: () {
-                  // 이미지 선택 기능 호출
-                  _pickImage();
-                },
-                child: const Text('이미지 변경'),
+                onPressed: _pickImage,
+                child: const Text(
+                  '이미지 변경',
+                  style: TextStyle(
+                    color: Color(0xFFA88BFA),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-              const SizedBox(height: 30),
-              _buildTextField(
-                label: '닉네임',
-                initialValue: '신이난_강동원_991211', // 현재 닉네임 (임시)
+              const SizedBox(height: 28),
+              // Nickname Field
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '닉네임',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[400],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _nicknameController,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF2C2C2E),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                label: '자기 소개',
-                initialValue: '안녕하세요.', // 현재 자기소개 (임시)
-                maxLines: 4, // 여러 줄 입력 가능
+              const SizedBox(height: 24),
+              // Bio Field
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '자기 소개',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[400],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _bioController,
+                    maxLines: 4,
+                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF2C2C2E),
+                      contentPadding: const EdgeInsets.all(16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required String label,
-    required String initialValue,
-    int maxLines = 1,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-        const SizedBox(height: 8),
-        TextFormField(
-          initialValue: initialValue,
-          maxLines: maxLines,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.grey[800],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

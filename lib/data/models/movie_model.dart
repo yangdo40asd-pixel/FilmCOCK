@@ -145,9 +145,14 @@ class KoficPerson {
 
 class ReviewChannel {
   final String name;
-  final String logoAsset;
+  final String? logoAsset;
+  final String youtubeUrl;
 
-  ReviewChannel({required this.name, required this.logoAsset});
+  ReviewChannel({
+    required this.name,
+    this.logoAsset,
+    this.youtubeUrl = '',
+  });
 }
 
 class Video {
