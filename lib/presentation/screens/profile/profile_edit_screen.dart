@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -11,6 +13,8 @@ class ProfileEditScreen extends StatefulWidget {
 }
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   final TextEditingController _nicknameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
@@ -33,16 +37,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nickname = prefs.getString('user_nickname') ?? '영화 매니아';
-    final bio = prefs.getString('user_bio') ?? '영화와 함께하는 일상!';
-    final imagePath = prefs.getString('user_profile_image');
+    final profile = await _settingsRepository.loadProfile();
+    final nickname = profile.nickname;
+    final bio = profile.bio;
+    final imagePath = profile.imagePath;
+    final hasSavedImage =
+        imagePath != null &&
+        imagePath.isNotEmpty &&
+        File(imagePath).existsSync();
+    if (imagePath != null && !hasSavedImage) {
+      await _settingsRepository.saveProfile(
+        UserProfileData(nickname: nickname, bio: bio),
+      );
+    }
 
+    if (!mounted) return;
     setState(() {
       _nicknameController.text = nickname;
       _bioController.text = bio;
-      _savedImagePath = imagePath;
-      if (imagePath != null && imagePath.isNotEmpty && File(imagePath).existsSync()) {
+      _savedImagePath = hasSavedImage ? imagePath : null;
+      if (hasSavedImage) {
         _imageFile = File(imagePath);
       }
       _isLoading = false;
@@ -59,14 +73,37 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
 
       if (pickedFile != null) {
+        final documents = await getApplicationDocumentsDirectory();
+        final extension = pickedFile.path.contains('.')
+            ? pickedFile.path.split('.').last
+            : 'jpg';
+        final savedFile = await File(pickedFile.path).copy(
+          '${documents.path}${Platform.pathSeparator}profile_${DateTime.now().millisecondsSinceEpoch}.$extension',
+        );
+        if (!mounted) return;
         setState(() {
-          _imageFile = File(pickedFile.path);
+          _imageFile = savedFile;
         });
       }
-    } catch (e) {
+    } on PlatformException catch (error) {
+      if (mounted) {
+        final message = error.code == 'photo_access_denied'
+            ? '사진 접근 권한이 없습니다. 기기 설정에서 권한을 허용해주세요.'
+            : '사진 앱에서 이미지를 불러오지 못했습니다. 다시 선택해주세요.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } on FileSystemException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지를 불러오지 못했습니다: ')),
+          const SnackBar(content: Text('선택한 이미지를 앱 저장 공간에 복사하지 못했습니다.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미지를 불러오지 못했습니다. 다른 이미지를 선택해주세요.')),
         );
       }
     }
@@ -77,19 +114,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     final bio = _bioController.text.trim();
 
     if (nickname.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('닉네임을 입력해주세요.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('닉네임을 입력해주세요.')));
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_nickname', nickname);
-    await prefs.setString('user_bio', bio);
-
-    if (_imageFile != null) {
-      await prefs.setString('user_profile_image', _imageFile!.path);
-    }
+    await _settingsRepository.saveProfile(
+      UserProfileData(
+        nickname: nickname,
+        bio: bio,
+        imagePath: _imageFile?.path ?? _savedImagePath,
+      ),
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -120,6 +157,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip: '뒤로 가기',
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
@@ -169,25 +207,25 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                             fit: BoxFit.cover,
                           )
                         : (_savedImagePath != null &&
-                                _savedImagePath!.isNotEmpty &&
-                                File(_savedImagePath!).existsSync())
-                            ? Image.file(
-                                File(_savedImagePath!),
-                                width: 110,
-                                height: 110,
-                                fit: BoxFit.cover,
-                              )
-                            : Image.asset(
-                                'assets/images/popcorn_logo.png',
-                                width: 110,
-                                height: 110,
-                                fit: BoxFit.contain,
-                                errorBuilder: (ctx, err, stack) => const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Color(0xFF8B5CF6),
-                                ),
-                              ),
+                              _savedImagePath!.isNotEmpty &&
+                              File(_savedImagePath!).existsSync())
+                        ? Image.file(
+                            File(_savedImagePath!),
+                            width: 110,
+                            height: 110,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.asset(
+                            'assets/images/popcorn_logo.png',
+                            width: 110,
+                            height: 110,
+                            fit: BoxFit.contain,
+                            errorBuilder: (ctx, err, stack) => const Icon(
+                              Icons.person,
+                              size: 60,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                          ),
                   ),
                 ),
               ),

@@ -22,18 +22,31 @@ class Movie {
   // JSON 데이터를 Movie 객체로 변환하는 factory 생성자
   factory Movie.fromJson(Map<String, dynamic> json) {
     return Movie(
-      id: json['id'],
-      title: json['title'],
-      overview: json['overview'],
-      posterPath: json['poster_path'],
-      backdropPath: json['backdrop_path'],
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? json['name'] as String? ?? '',
+      overview: json['overview'] as String? ?? '',
+      posterPath: json['poster_path'] as String?,
+      backdropPath: json['backdrop_path'] as String?,
       // vote_average가 int로 올 수도 있고 double로 올 수도 있어서 num으로 받고 변환
-      voteAverage: (json['vote_average'] as num).toDouble(),
-      releaseDate: json['release_date'] ?? '',
+      voteAverage: (json['vote_average'] as num?)?.toDouble() ?? 0,
+      releaseDate: json['release_date'] as String? ?? '',
       genres: json['genres'] != null
           ? (json['genres'] as List).map((g) => Genre.fromJson(g)).toList()
           : [],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'overview': overview,
+      'poster_path': posterPath,
+      'backdrop_path': backdropPath,
+      'vote_average': voteAverage,
+      'release_date': releaseDate,
+      'genres': genres.map((genre) => genre.toJson()).toList(),
+    };
   }
 
   // 이미지 URL을 완성하는 getter
@@ -53,6 +66,8 @@ class Genre {
   factory Genre.fromJson(Map<String, dynamic> json) {
     return Genre(id: json['id'], name: json['name']);
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
 class Person {
@@ -80,13 +95,24 @@ class Person {
 
   factory Person.fromJson(Map<String, dynamic> json) {
     return Person(
-      id: json['id'],
+      id: json['id'] as int? ?? 0,
       name: json['name'] ?? '',
       originalName: json['original_name'] ?? '',
       profilePath: json['profile_path'],
       knownForDepartment: json['known_for_department'] ?? '',
       filmographyCount: json['filmography_count'] as int? ?? 0,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'original_name': originalName,
+      'profile_path': profilePath,
+      'known_for_department': knownForDepartment,
+      'filmography_count': filmographyCount,
+    };
   }
 
   String get fullProfileUrl =>
@@ -148,11 +174,7 @@ class ReviewChannel {
   final String? logoAsset;
   final String youtubeUrl;
 
-  ReviewChannel({
-    required this.name,
-    this.logoAsset,
-    this.youtubeUrl = '',
-  });
+  ReviewChannel({required this.name, this.logoAsset, this.youtubeUrl = ''});
 }
 
 class Video {
@@ -163,7 +185,11 @@ class Video {
   Video({required this.key, required this.site, required this.type});
 
   factory Video.fromJson(Map<String, dynamic> json) {
-    return Video(key: json['key'], site: json['site'], type: json['type']);
+    return Video(
+      key: json['key'] as String? ?? '',
+      site: json['site'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+    );
   }
 }
 

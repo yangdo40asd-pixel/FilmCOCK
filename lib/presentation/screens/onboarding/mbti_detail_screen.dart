@@ -8,7 +8,12 @@ import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen
 
 class MbtiDetailScreen extends StatefulWidget {
   final MbtiInfo mbtiInfo;
-  const MbtiDetailScreen({super.key, required this.mbtiInfo});
+  final bool isResetMode;
+  const MbtiDetailScreen({
+    super.key,
+    required this.mbtiInfo,
+    this.isResetMode = false,
+  });
   @override
   State<MbtiDetailScreen> createState() => _MbtiDetailScreenState();
 }
@@ -21,11 +26,23 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
   int _currentPage = 0;
 
   static const Map<String, int> _genreIdMap = {
-    'action': 28, 'adventure': 12, 'animation': 16, 'comedy': 35,
-    'crime': 80, 'documentary': 99, 'drama': 18, 'family': 10751,
-    'fantasy': 14, 'history': 36, 'horror': 27, 'music': 10402,
-    'mystery': 9648, 'romance': 10749, 'sf': 878, 'sports': 10402,
-    'thriller': 53, 'war': 10752,
+    'action': 28,
+    'adventure': 12,
+    'animation': 16,
+    'comedy': 35,
+    'crime': 80,
+    'documentary': 99,
+    'drama': 18,
+    'family': 10751,
+    'fantasy': 14,
+    'history': 36,
+    'horror': 27,
+    'music': 10402,
+    'mystery': 9648,
+    'romance': 10749,
+    'sf': 878,
+    'thriller': 53,
+    'war': 10752,
   };
 
   @override
@@ -124,19 +141,29 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.of(dialogContext).pop();
-                      Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) =>
-                            GenreSelectScreen(mbtiInfo: widget.mbtiInfo),
-                      ));
+                      final changed = await Navigator.of(context).push<bool>(
+                        MaterialPageRoute(
+                          builder: (_) => GenreSelectScreen(
+                            mbtiInfo: widget.mbtiInfo,
+                            isResetMode: widget.isResetMode,
+                          ),
+                        ),
+                      );
+                      if (changed == true && mounted && widget.isResetMode) {
+                        Navigator.of(context).pop(true);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text(
                       '예',
@@ -203,7 +230,8 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
         height: 220,
         color: const Color(0xFF2C2C3E),
         child: const Center(
-            child: CircularProgressIndicator(color: Color(0xFF8B5CF6))),
+          child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
+        ),
       );
     }
     if (_recommendedMovies.isEmpty) {
@@ -345,9 +373,10 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
           Text(
             mbti.title,
             style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: Colors.white),
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -384,7 +413,10 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
             child: Text(
               content,
               style: const TextStyle(
-                  fontSize: 14, color: Colors.white, height: 1.6),
+                fontSize: 14,
+                color: Colors.white,
+                height: 1.6,
+              ),
             ),
           ),
         ],
@@ -415,8 +447,8 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
             const Padding(
               padding: EdgeInsets.all(20),
               child: Center(
-                  child: CircularProgressIndicator(
-                      color: Color(0xFF8B5CF6))),
+                child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
+              ),
             )
           else
             SizedBox(
@@ -442,8 +474,10 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
                               width: 100,
                               errorBuilder: (_, __, ___) => Container(
                                 color: const Color(0xFF2C2C3E),
-                                child: const Icon(Icons.movie,
-                                    color: Colors.grey),
+                                child: const Icon(
+                                  Icons.movie,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                           ),
@@ -454,7 +488,9 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: Colors.white70),
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
                         ),
                       ],
                     ),
@@ -476,9 +512,10 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
           const Text(
             '대표 인물',
             style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 12),
           ...mbti.famousPeople.map(
@@ -488,9 +525,10 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
                 children: [
                   const Icon(Icons.person, color: Colors.grey, size: 20),
                   const SizedBox(width: 12),
-                  Text(person,
-                      style: const TextStyle(
-                          fontSize: 15, color: Colors.white)),
+                  Text(
+                    person,
+                    style: const TextStyle(fontSize: 15, color: Colors.white),
+                  ),
                 ],
               ),
             ),
@@ -516,17 +554,18 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
               child: OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(
-                      color: Color(0xFF8B5CF6), width: 1.5),
+                  side: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Text(
                   '뒤로가기',
                   style: TextStyle(
-                      color: Color(0xFF8B5CF6),
-                      fontWeight: FontWeight.bold),
+                    color: Color(0xFF8B5CF6),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -539,7 +578,8 @@ class _MbtiDetailScreenState extends State<MbtiDetailScreen> {
                   backgroundColor: const Color(0xFF8B5CF6),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Text(
                   '확인',

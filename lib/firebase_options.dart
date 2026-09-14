@@ -64,8 +64,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '791108439820',
     projectId: 'filmcock-99086',
     storageBucket: 'filmcock-99086.firebasestorage.app',
-    androidClientId: '791108439820-f488k716i3gbpfiqarecmbcvp14hidqm.apps.googleusercontent.com',
-    iosClientId: '791108439820-j5irkq0gductlpmnrlfj43d3fskvhkde.apps.googleusercontent.com',
+    androidClientId:
+        '791108439820-f488k716i3gbpfiqarecmbcvp14hidqm.apps.googleusercontent.com',
+    iosClientId:
+        '791108439820-j5irkq0gductlpmnrlfj43d3fskvhkde.apps.googleusercontent.com',
     iosBundleId: 'com.example.filmcockApp',
   );
 
@@ -75,8 +77,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '791108439820',
     projectId: 'filmcock-99086',
     storageBucket: 'filmcock-99086.firebasestorage.app',
-    androidClientId: '791108439820-f488k716i3gbpfiqarecmbcvp14hidqm.apps.googleusercontent.com',
-    iosClientId: '791108439820-j5irkq0gductlpmnrlfj43d3fskvhkde.apps.googleusercontent.com',
+    androidClientId:
+        '791108439820-f488k716i3gbpfiqarecmbcvp14hidqm.apps.googleusercontent.com',
+    iosClientId:
+        '791108439820-j5irkq0gductlpmnrlfj43d3fskvhkde.apps.googleusercontent.com',
     iosBundleId: 'com.example.filmcockApp',
   );
 

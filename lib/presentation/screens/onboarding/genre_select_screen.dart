@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/models/mbti_info.dart';
 import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:filmcock_app/data/services/preference_change_service.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 
 class GenreItem {
   final String id;
@@ -25,11 +26,13 @@ class GenreItem {
 class GenreSelectScreen extends StatefulWidget {
   final MbtiInfo mbtiInfo;
   final bool isResetMode;
+  final bool preferSavedGenres;
 
   const GenreSelectScreen({
     super.key,
     required this.mbtiInfo,
     this.isResetMode = false,
+    this.preferSavedGenres = false,
   });
 
   @override
@@ -37,6 +40,8 @@ class GenreSelectScreen extends StatefulWidget {
 }
 
 class _GenreSelectScreenState extends State<GenreSelectScreen> {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   late List<GenreItem> _genres;
 
   @override
@@ -47,13 +52,12 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
   }
 
   Future<void> _loadInitialSelections() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedGenres = prefs.getStringList('user_genres');
+    final savedGenres = await _settingsRepository.loadGenres();
 
     if (!mounted) return;
     setState(() {
       for (final genre in _genres) {
-        if (savedGenres != null && savedGenres.isNotEmpty) {
+        if (widget.preferSavedGenres && savedGenres.isNotEmpty) {
           if (savedGenres.contains(genre.id)) {
             genre.isSelected = true;
           }
@@ -89,7 +93,6 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
       GenreItem(id: 'mystery', label: '미스터리', color: const Color(0xFF374151)),
       GenreItem(id: 'romance', label: '로맨스', color: const Color(0xFFF43F5E)),
       GenreItem(id: 'sf', label: 'SF', color: const Color(0xFF0EA5E9)),
-      GenreItem(id: 'sports', label: '스포츠', color: const Color(0xFF22C55E)),
       GenreItem(id: 'thriller', label: '스릴러', color: const Color(0xFF111827)),
       GenreItem(id: 'war', label: '전쟁', color: const Color(0xFF4B5563)),
     ];
@@ -193,16 +196,30 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
   // [건너뛰기] 버튼: 안내 팝업 먼저 표시
 
   Future<void> _saveAndNavigate() async {
-    final prefs = await SharedPreferences.getInstance();
     final selectedIds = _selectedGenres.map((g) => g.id).toList();
-    await prefs.setStringList('user_genres', selectedIds);
+    try {
+      await _settingsRepository.saveOnboardingPreferences(
+        mbti: widget.mbtiInfo.id == 'NONE' ? null : widget.mbtiInfo.id,
+        genres: selectedIds,
+        mbtiSkipped: widget.mbtiInfo.id == 'NONE',
+        genresSkipped: false,
+      );
+      PreferenceChangeService.notifyChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('취향을 저장하지 못했습니다. 다시 시도해주세요.')),
+      );
+      return;
+    }
 
     if (!mounted) return;
     if (widget.isResetMode && Navigator.of(context).canPop()) {
       Navigator.of(context).pop(true);
     } else {
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const MainScreen()),
+        (_) => false,
       );
     }
   }
@@ -243,13 +260,36 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                 children: [
                   ElevatedButton(
                     onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.remove('user_mbti');
+                      try {
+                        await _settingsRepository.saveOnboardingPreferences(
+                          mbti: widget.mbtiInfo.id == 'NONE'
+                              ? null
+                              : widget.mbtiInfo.id,
+                          genres: const [],
+                          mbtiSkipped: widget.mbtiInfo.id == 'NONE',
+                          genresSkipped: true,
+                        );
+                        PreferenceChangeService.notifyChanged();
+                      } catch (_) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('취향을 저장하지 못했습니다. 다시 시도해주세요.'),
+                          ),
+                        );
+                        return;
+                      }
                       if (!mounted || !dialogContext.mounted) return;
                       Navigator.of(dialogContext).pop();
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (_) => const MainScreen()),
-                      );
+                      if (widget.isResetMode &&
+                          Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop(true);
+                      } else {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const MainScreen()),
+                          (_) => false,
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
@@ -313,13 +353,17 @@ class _GenreSelectScreenState extends State<GenreSelectScreen> {
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-              child: Text(
-                '▶ ${widget.mbtiInfo.id} 추천 장르가 기본으로 선택되었습니다.',
-                style: const TextStyle(fontSize: 13, color: Color(0xFFFBBF24)),
+            if (widget.mbtiInfo.id != 'NONE')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Text(
+                  '▶ ${widget.mbtiInfo.id} 추천 장르가 기본으로 선택되었습니다.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFFBBF24),
+                  ),
+                ),
               ),
-            ),
             const SizedBox(height: 16),
             Expanded(
               child: GridView.builder(

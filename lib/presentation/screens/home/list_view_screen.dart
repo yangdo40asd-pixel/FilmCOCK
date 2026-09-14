@@ -3,12 +3,24 @@ import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.dart';
+import 'package:filmcock_app/presentation/widgets/app_network_image.dart';
 
 class ListViewScreen extends StatelessWidget {
   final String title;
-  final List<dynamic> items;
+  final List<Movie> movies;
+  final List<Person> people;
 
-  const ListViewScreen({super.key, required this.title, required this.items});
+  const ListViewScreen.movies({
+    super.key,
+    required this.title,
+    required this.movies,
+  }) : people = const <Person>[];
+
+  const ListViewScreen.people({
+    super.key,
+    required this.title,
+    required this.people,
+  }) : movies = const <Movie>[];
 
   @override
   Widget build(BuildContext context) {
@@ -20,24 +32,19 @@ class ListViewScreen extends StatelessWidget {
       ),
       body: GridView.builder(
         padding: const EdgeInsets.all(16.0),
-        itemCount: items.length,
+        itemCount: movies.isNotEmpty ? movies.length : people.length,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3, // 한 줄에 3개씩 표시
           crossAxisSpacing: 16.0,
           mainAxisSpacing: 16.0,
           // 아이템의 가로세로 비율 조정
-          childAspectRatio: items.isNotEmpty && items.first is Movie
-              ? (100 / 180)
-              : (80 / 110),
+          childAspectRatio: movies.isNotEmpty ? (100 / 180) : (80 / 110),
         ),
         itemBuilder: (context, index) {
-          final item = items[index];
-          if (item is Movie) {
-            return _buildMovieItem(context, item);
-          } else if (item is Person) {
-            return _buildPersonItem(context, item);
+          if (movies.isNotEmpty) {
+            return _buildMovieItem(context, movies[index]);
           }
-          return const SizedBox.shrink(); // 해당 없는 타입은 빈 위젯
+          return _buildPersonItem(context, people[index]);
         },
       ),
     );
@@ -57,12 +64,9 @@ class ListViewScreen extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: Image.network(
-                movie.fullPosterUrl,
-                fit: BoxFit.cover,
+              child: AppNetworkImage(
+                imageUrl: movie.fullPosterUrl,
                 width: double.infinity,
-                errorBuilder: (context, error, stackTrace) =>
-                    Container(color: Colors.grey[800]),
               ),
             ),
           ),

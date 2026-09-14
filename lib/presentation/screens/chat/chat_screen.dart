@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/chatbot/chatbot_database.dart';
 import 'package:filmcock_app/data/services/chatbot_service.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
+import 'package:filmcock_app/presentation/widgets/app_loading_indicator.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,6 +18,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final List<ChatMessage> _messages = [];
   bool _isProcessing = false;
+  int _requestId = 0;
   String _selectedCategory = '전체';
 
   final List<String> _categories = ['전체', '기분', '상황', '테마', 'MBTI'];
@@ -27,7 +29,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // 챗봇 첫 인사 메시지
     _messages.add(
       ChatMessage(
-        text: '안녕하세요. 필름콕 AI 영화 도슨트입니다. 기분, 상황, 선호하는 장르를 말씀해주시면 딱 맞는 맞춤 영화를 안내해 드립니다.',
+        text:
+            '안녕하세요. 필름콕 영화 추천 도슨트입니다. 앱에 준비된 추천 규칙을 바탕으로 기분, 상황, 장르와 MBTI에 맞는 영화를 안내해 드립니다.',
         isUser: false,
       ),
     );
@@ -52,9 +55,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _handleUserMessage(String userText) async {
+  Future<void> _handleUserMessage(String userText, {String? promptId}) async {
     final trimmed = userText.trim();
     if (trimmed.isEmpty || _isProcessing) return;
+    final requestId = ++_requestId;
 
     _inputController.clear();
     setState(() {
@@ -63,20 +67,32 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     _scrollToBottom();
 
-    // 챗봇 알고리즘 처리
-    final response = await _chatbotService.processInput(trimmed);
-
-    if (mounted) {
-      setState(() {
-        _messages.add(response);
-        _isProcessing = false;
-      });
+    try {
+      final response = await _chatbotService.processInput(
+        trimmed,
+        promptId: promptId,
+      );
+      if (!mounted || requestId != _requestId) return;
+      setState(() => _messages.add(response));
       _scrollToBottom();
+    } catch (_) {
+      if (!mounted || requestId != _requestId) return;
+      setState(() {
+        _messages.add(
+          ChatMessage(text: '추천을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.', isUser: false),
+        );
+      });
+    } finally {
+      if (mounted && requestId == _requestId) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
   void _resetChat() {
     setState(() {
+      _requestId++;
+      _isProcessing = false;
       _chatbotService.reset();
       _messages.clear();
       _messages.add(
@@ -106,9 +122,10 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF141418) : const Color(0xFFF7F7FA);
-    final appBarColor = isDark ? const Color(0xFF1E1E26) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF191919);
+    final colors = Theme.of(context).colorScheme;
+    final bgColor = colors.surface;
+    final appBarColor = colors.surfaceContainer;
+    final textColor = colors.onSurface;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -117,10 +134,11 @@ class _ChatScreenState extends State<ChatScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
+          tooltip: '뒤로 가기',
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          '필름콕 AI 도슨트',
+          '필름콕 영화 도슨트',
           style: TextStyle(
             color: textColor,
             fontSize: 18,
@@ -146,7 +164,10 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 16.0,
+              ),
               itemCount: _messages.length + (_isProcessing ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index == _messages.length && _isProcessing) {
@@ -167,12 +188,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // 상단 상시 추천 질문 바
   Widget _buildPromptShelf(bool isDark) {
-    final chipBg = isDark ? const Color(0xFF1E1E26) : Colors.white;
-    final activeTabColor = const Color(0xFF6B4EE6);
+    final colors = Theme.of(context).colorScheme;
+    final chipBg = colors.surfaceContainer;
+    final activeTabColor = colors.primary;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      color: isDark ? const Color(0xFF191920) : const Color(0xFFF0F0F4),
+      color: colors.surfaceContainerLow,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -209,8 +231,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? Colors.white
                             : (isDark ? Colors.grey[400] : Colors.grey[700]),
                         fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -230,7 +253,8 @@ class _ChatScreenState extends State<ChatScreen> {
               itemBuilder: (context, index) {
                 final prompt = _filteredPrompts[index];
                 return GestureDetector(
-                  onTap: () => _handleUserMessage(prompt.queryText),
+                  onTap: () =>
+                      _handleUserMessage(prompt.queryText, promptId: prompt.id),
                   child: Container(
                     margin: const EdgeInsets.only(right: 8.0),
                     padding: const EdgeInsets.symmetric(horizontal: 14.0),
@@ -238,7 +262,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       color: isDark ? const Color(0xFF262632) : Colors.white,
                       borderRadius: BorderRadius.circular(18.0),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF3E3E4E) : Colors.grey[300]!,
+                        color: isDark
+                            ? const Color(0xFF3E3E4E)
+                            : Colors.grey[300]!,
                       ),
                       boxShadow: isDark
                           ? null
@@ -247,14 +273,16 @@ class _ChatScreenState extends State<ChatScreen> {
                                 color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
-                              )
+                              ),
                             ],
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       prompt.label,
                       style: TextStyle(
-                        color: isDark ? Colors.grey[200] : const Color(0xFF222222),
+                        color: isDark
+                            ? Colors.grey[200]
+                            : const Color(0xFF222222),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -376,9 +404,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 runSpacing: 8.0,
                 children: message.followUpOptions!.map((option) {
                   return ActionChip(
-                    backgroundColor:
-                        isDark ? const Color(0xFF2E2E3C) : const Color(0xFFEDE9FE),
-                    side: const BorderSide(color: Color(0xFF8B5CF6), width: 1.2),
+                    backgroundColor: isDark
+                        ? const Color(0xFF2E2E3C)
+                        : const Color(0xFFEDE9FE),
+                    side: const BorderSide(
+                      color: Color(0xFF8B5CF6),
+                      width: 1.2,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -409,7 +441,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemCount: message.recommendedMovies!.length,
                   itemBuilder: (context, idx) {
                     final movie = message.recommendedMovies![idx];
-                    final reason = (message.movieReasons != null &&
+                    final reason =
+                        (message.movieReasons != null &&
                             idx < message.movieReasons!.length)
                         ? message.movieReasons![idx]
                         : '';
@@ -427,7 +460,9 @@ class _ChatScreenState extends State<ChatScreen> {
                         width: 140,
                         margin: const EdgeInsets.only(right: 12.0),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF282834) : Colors.white,
+                          color: isDark
+                              ? const Color(0xFF282834)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: isDark ? Colors.white12 : Colors.black12,
@@ -439,7 +474,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     color: Colors.black.withValues(alpha: 0.05),
                                     blurRadius: 6,
                                     offset: const Offset(0, 3),
-                                  )
+                                  ),
                                 ],
                         ),
                         child: Column(
@@ -562,7 +597,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF22222C) : Colors.white,
               borderRadius: BorderRadius.circular(18),
@@ -576,7 +614,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(
+                  child: AppLoadingIndicator(
+                    label: '영화 추천 답변을 준비하는 중입니다.',
                     strokeWidth: 2,
                     color: const Color(0xFF8B5CF6),
                   ),
@@ -608,9 +647,7 @@ class _ChatScreenState extends State<ChatScreen> {
       decoration: BoxDecoration(
         color: barBg,
         border: Border(
-          top: BorderSide(
-            color: isDark ? Colors.white12 : Colors.black12,
-          ),
+          top: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
         ),
       ),
       child: SafeArea(
@@ -649,11 +686,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Color(0xFF6B4EE6),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.send,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: const Icon(Icons.send, color: Colors.white, size: 20),
               ),
             ),
           ],

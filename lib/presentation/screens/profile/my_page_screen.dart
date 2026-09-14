@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/calendar/calendar_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
@@ -9,6 +7,10 @@ import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.da
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/profile/profile_edit_screen.dart';
 import 'package:filmcock_app/presentation/screens/profile/settings_screen.dart';
+import 'package:filmcock_app/data/repositories/activity_repository.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
+import 'package:filmcock_app/data/services/activity_change_service.dart';
+import 'package:filmcock_app/presentation/widgets/my_page_tier_section.dart';
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({super.key});
@@ -18,6 +20,9 @@ class MyPageScreen extends StatefulWidget {
 }
 
 class _MyPageScreenState extends State<MyPageScreen> {
+  final ActivityRepository _activityRepository = const ActivityRepository();
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   String _nickname = '영화 매니아';
   String _bio = '영화와 함께하는 일상!';
   String? _profileImagePath;
@@ -27,78 +32,45 @@ class _MyPageScreenState extends State<MyPageScreen> {
   List<Map<String, dynamic>> _comments = [];
   List<Map<String, dynamic>> _likedPeople = [];
   bool _isLoading = true;
+  int _loadId = 0;
 
   @override
   void initState() {
     super.initState();
+    ActivityChangeService.revision.addListener(_handleActivityChange);
+    _loadUserData();
+  }
+
+  @override
+  void dispose() {
+    ActivityChangeService.revision.removeListener(_handleActivityChange);
+    super.dispose();
+  }
+
+  void _handleActivityChange() {
     _loadUserData();
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final loadId = ++_loadId;
+    final loaded = await Future.wait<Object>([
+      _settingsRepository.loadProfile(),
+      _activityRepository.watchedMovies(),
+      _activityRepository.likedMovies(),
+      _activityRepository.comments(),
+      _activityRepository.likedPeople(),
+    ]);
+    final profile = loaded[0] as UserProfileData;
+    final watched = loaded[1] as List<Map<String, dynamic>>;
+    final liked = loaded[2] as List<Map<String, dynamic>>;
+    final comments = loaded[3] as List<Map<String, dynamic>>;
+    final people = loaded[4] as List<Map<String, dynamic>>;
 
-    // 1. Profile
-    final nickname = prefs.getString('user_nickname') ?? '영화 매니아';
-    final bio = prefs.getString('user_bio') ?? '영화와 함께하는 일상!';
-    final profileImg = prefs.getString('user_profile_image');
-
-    // 2. Watched & Liked Movies (Filter out any dummy data)
-    final rawWatched = prefs.getStringList('watched_movies_data') ?? [];
-    final watched = _parseJsonList(rawWatched)
-        .where((m) =>
-            m['title'] != '인터스텔라' &&
-            m['title'] != '인셉션' &&
-            m['title'] != '기생충')
-        .toList();
-
-    final rawLiked = prefs.getStringList('liked_movies_data') ?? [];
-    final liked = _parseJsonList(rawLiked)
-        .where((m) =>
-            m['title'] != '인터스텔라' &&
-            m['title'] != '인셉션' &&
-            m['title'] != '기생충')
-        .toList();
-
-    // 3. Comments (Filter out any dummy comments)
-    final rawComments = prefs.getStringList('user_comments') ?? [];
-    final comments = _parseJsonList(rawComments)
-        .where((m) =>
-            m['movieTitle'] != '반지의 제왕: 왕의 귀환' &&
-            m['movieTitle'] != '레지던트 이블')
-        .toList();
-
-    // 4. Liked People (Filter out any dummy people)
-    final rawPeople = prefs.getStringList('liked_people') ?? [];
-    final people = _parseJsonList(rawPeople)
-        .where((p) =>
-            p['name'] != '봉준호' &&
-            p['name'] != '송강호' &&
-            p['name'] != '박찬욱')
-        .toList();
-
-    // Persist cleaned data to purge dummy items from storage
-    await prefs.setStringList(
-      'watched_movies_data',
-      watched.map((e) => jsonEncode(e)).toList(),
-    );
-    await prefs.setStringList(
-      'liked_movies_data',
-      liked.map((e) => jsonEncode(e)).toList(),
-    );
-    await prefs.setStringList(
-      'user_comments',
-      comments.map((e) => jsonEncode(e)).toList(),
-    );
-    await prefs.setStringList(
-      'liked_people',
-      people.map((e) => jsonEncode(e)).toList(),
-    );
-
-    if (mounted) {
+    if (mounted && loadId == _loadId) {
       setState(() {
-        _nickname = nickname;
-        _bio = bio;
-        _profileImagePath = profileImg;
+        _nickname = profile.nickname;
+        _bio = profile.bio;
+        _profileImagePath = profile.imagePath;
         _watchedMovies = watched;
         _likedMovies = liked;
         _comments = comments;
@@ -106,16 +78,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
         _isLoading = false;
       });
     }
-  }
-
-  List<Map<String, dynamic>> _parseJsonList(List<String> list) {
-    return list.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((m) => m.isNotEmpty).toList();
   }
 
   String _getFullImageUrl(String? path, {bool isPerson = false}) {
@@ -130,8 +92,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
   int get _currentTierLevel {
     if (_totalActions >= 15) return 3; // 초고수
-    if (_totalActions >= 5) return 2;  // 고수
-    return 1;                          // 초심자
+    if (_totalActions >= 5) return 2; // 고수
+    return 1; // 초심자
   }
 
   String get _tierProgressText {
@@ -160,11 +122,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
         ),
         content: const Text(
           '봤어요! 버튼을 눌러 작품을 추가해보세요.',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-            height: 1.4,
-          ),
+          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
@@ -172,9 +130,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
               Navigator.pop(ctx);
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const CalendarScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const CalendarScreen()),
               ).then((_) => _loadUserData());
             },
             child: const Text(
@@ -218,6 +174,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            tooltip: '설정 열기',
             onPressed: () {
               Navigator.push(
                 context,
@@ -241,7 +198,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
               _buildProfileCard(),
 
               // 2. 등급 배너 ("영화를 많이 볼수록 등급이 오릅니다!")
-              _buildTierSection(),
+              MyPageTierSection(
+                currentTier: _currentTierLevel,
+                progressText: _tierProgressText,
+              ),
 
               // 3. 본 작품 캘린더 버튼
               _buildCalendarButton(),
@@ -288,13 +248,11 @@ class _MyPageScreenState extends State<MyPageScreen> {
               border: Border.all(color: Colors.white24, width: 2),
             ),
             child: ClipOval(
-              child: (_profileImagePath != null &&
+              child:
+                  (_profileImagePath != null &&
                       _profileImagePath!.isNotEmpty &&
                       File(_profileImagePath!).existsSync())
-                  ? Image.file(
-                      File(_profileImagePath!),
-                      fit: BoxFit.cover,
-                    )
+                  ? Image.file(File(_profileImagePath!), fit: BoxFit.cover)
                   : Image.asset(
                       'assets/images/popcorn_logo.png',
                       fit: BoxFit.contain,
@@ -323,10 +281,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 const SizedBox(height: 4),
                 Text(
                   _bio,
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -362,130 +317,6 @@ class _MyPageScreenState extends State<MyPageScreen> {
     );
   }
 
-  // 2. 등급 배너 ("영화를 많이 볼수록 등급이 오릅니다!")
-  Widget _buildTierSection() {
-    final currentTier = _currentTierLevel;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      padding: const EdgeInsets.all(18.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E22),
-        borderRadius: BorderRadius.circular(16.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '영화를 많이 볼수록 등급이 오릅니다!',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildTierBadge(
-                title: '초심자',
-                imagePath: 'assets/images/tier/tier_beginner.png',
-                isUnlocked: currentTier >= 1,
-                isCurrent: currentTier == 1,
-              ),
-              Expanded(
-                child: Container(
-                  height: 3,
-                  color: currentTier >= 2
-                      ? const Color(0xFF8B5CF6)
-                      : Colors.white12,
-                ),
-              ),
-              _buildTierBadge(
-                title: '고수',
-                imagePath: 'assets/images/tier/tier_master.png',
-                isUnlocked: currentTier >= 2,
-                isCurrent: currentTier == 2,
-              ),
-              Expanded(
-                child: Container(
-                  height: 3,
-                  color: currentTier >= 3
-                      ? const Color(0xFF8B5CF6)
-                      : Colors.white12,
-                ),
-              ),
-              _buildTierBadge(
-                title: '초고수',
-                imagePath: 'assets/images/tier/tier_grandmaster.jpeg',
-                isUnlocked: currentTier >= 3,
-                isCurrent: currentTier == 3,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Center(
-            child: Text(
-              _tierProgressText,
-              style: const TextStyle(
-                color: Color(0xFFA88BFA),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTierBadge({
-    required String title,
-    required String imagePath,
-    required bool isUnlocked,
-    required bool isCurrent,
-  }) {
-    return Column(
-      children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: isCurrent
-                ? Border.all(color: const Color(0xFFA88BFA), width: 2.5)
-                : null,
-          ),
-          child: ClipOval(
-            child: Opacity(
-              opacity: isUnlocked ? 1.0 : 0.35,
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, err, stack) => Icon(
-                  Icons.military_tech,
-                  size: 36,
-                  color: isUnlocked ? const Color(0xFF8B5CF6) : Colors.grey,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          title,
-          style: TextStyle(
-            color: isUnlocked ? Colors.white : Colors.grey[600],
-            fontSize: 12,
-            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // 3. 본 작품 캘린더 버튼
   Widget _buildCalendarButton() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -549,7 +380,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
         const SizedBox(height: 12),
         if (uniqueMovies.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 8.0,
+            ),
             child: Text(
               '영화 상세에서 "좋아요(하트)"를 누르면 여기에 추천 띵작으로 등록됩니다.',
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
@@ -566,7 +400,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 final movie = uniqueMovies[index];
                 final posterPath = movie['posterPath'] as String?;
                 final title = movie['title'] as String? ?? '영화 제목';
-                final voteAverage = (movie['voteAverage'] as num?)?.toDouble() ?? 8.0;
+                final voteAverage =
+                    (movie['voteAverage'] as num?)?.toDouble() ?? 8.0;
                 final fullPosterUrl = _getFullImageUrl(posterPath);
 
                 return GestureDetector(
@@ -600,8 +435,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                   width: 105,
                                   height: 135,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stack) =>
-                                      Container(
+                                  errorBuilder: (ctx, err, stack) => Container(
                                     width: 105,
                                     height: 135,
                                     color: Colors.grey[800],
@@ -662,7 +496,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
         const SizedBox(height: 12),
         if (_likedPeople.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 8.0,
+            ),
             child: Text(
               '좋아하는 배우나 감독의 상세 페이지에서 하트를 눌러보세요!',
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
@@ -680,7 +517,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 final name = person['name'] as String? ?? '인물';
                 final profileUrl = person['profileUrl'] as String? ?? '';
                 final isActor = person['department'] == '배우';
-                final fullProfileUrl = _getFullImageUrl(profileUrl, isPerson: true);
+                final fullProfileUrl = _getFullImageUrl(
+                  profileUrl,
+                  isPerson: true,
+                );
 
                 return GestureDetector(
                   onTap: () {
@@ -691,7 +531,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         name: name,
                         knownForDepartment: 'Acting',
                         profilePath: profileUrl.isNotEmpty
-                            ? profileUrl.replaceFirst('https://image.tmdb.org/t/p/w500', '')
+                            ? profileUrl.replaceFirst(
+                                'https://image.tmdb.org/t/p/w500',
+                                '',
+                              )
                             : null,
                       );
                       Navigator.push(
@@ -783,7 +626,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
         const SizedBox(height: 12),
         if (_comments.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20.0,
+              vertical: 8.0,
+            ),
             child: Text(
               '아직 작성한 댓글이 없습니다. 영화 상세화면에서 댓글을 남겨보세요!',
               style: TextStyle(color: Colors.grey[500], fontSize: 13),
@@ -841,8 +687,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 width: 52,
                                 height: 74,
                                 fit: BoxFit.cover,
-                                errorBuilder: (ctx, err, stack) =>
-                                    Container(
+                                errorBuilder: (ctx, err, stack) => Container(
                                   width: 52,
                                   height: 74,
                                   color: Colors.grey[800],

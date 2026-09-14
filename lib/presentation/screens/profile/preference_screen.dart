@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/data/models/mbti_info.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
+import 'package:filmcock_app/data/services/personalized_recommendation_service.dart';
+import 'package:filmcock_app/data/services/preference_change_service.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/mbti_select_screen.dart';
@@ -15,66 +17,47 @@ class PreferenceScreen extends StatefulWidget {
 }
 
 class _PreferenceScreenState extends State<PreferenceScreen> {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   Future<List<Movie>>? _recommendedMoviesFuture;
   String? _userMbti;
-
-  // MBTI별 대표 TMDB 장르 ID 매핑
-  static const Map<String, int> _mbtiGenreMap = {
-    'ESTP': 28, // 액션
-    'ESFP': 35, // 코미디
-    'ISTP': 878, // SF
-    'ISFP': 10749, // 로맨스
-    'ENTJ': 12, // 어드벤처
-    'ENTP': 9648, // 미스터리
-    'INTJ': 18, // 드라마
-    'INTP': 99, // 다큐멘터리
-    'ESTJ': 80, // 범죄
-    'ESFJ': 10751, // 가족
-    'ISTJ': 36, // 역사
-    'ISFJ': 18, // 드라마
-    'ENFJ': 10749, // 로맨스
-    'ENFP': 14, // 판타지
-    'INFJ': 18, // 드라마
-    'INFP': 16, // 애니메이션
-  };
-
-  // 장르 문자열 키 -> TMDB 장르 ID 매핑
-  static const Map<String, int> _genreStringToId = {
-    'action': 28,
-    'adventure': 12,
-    'animation': 16,
-    'comedy': 35,
-    'crime': 80,
-    'documentary': 99,
-    'drama': 18,
-    'family': 10751,
-    'fantasy': 14,
-    'history': 36,
-    'horror': 27,
-    'music': 10402,
-    'mystery': 9648,
-    'romance': 10749,
-    'sf': 878,
-    'sports': 10770,
-    'thriller': 53,
-    'war': 10752,
-  };
+  List<String> _userGenres = const [];
+  int _loadId = 0;
 
   @override
   void initState() {
     super.initState();
+    PreferenceChangeService.revision.addListener(_handlePreferenceChange);
+    _loadRecommendations();
+  }
+
+  @override
+  void dispose() {
+    PreferenceChangeService.revision.removeListener(_handlePreferenceChange);
+    super.dispose();
+  }
+
+  void _handlePreferenceChange() {
     _loadRecommendations();
   }
 
   Future<void> _loadRecommendations() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedMbti = prefs.getString('user_mbti');
-    final savedGenres = prefs.getStringList('user_genres') ?? [];
+    final loadId = ++_loadId;
+    final values = await Future.wait<Object?>([
+      _settingsRepository.loadMbti(),
+      _settingsRepository.loadGenres(),
+    ]);
+    final savedMbti = values[0] as String?;
+    final savedGenres = values[1] as List<String>;
 
-    if (!mounted) return;
+    if (!mounted || loadId != _loadId) return;
     setState(() {
       _userMbti = savedMbti;
-      _recommendedMoviesFuture = _fetchPersonalizedMovies(savedMbti, savedGenres);
+      _userGenres = savedGenres;
+      _recommendedMoviesFuture = _fetchPersonalizedMovies(
+        savedMbti,
+        savedGenres,
+      );
     });
   }
 
@@ -82,54 +65,18 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
     String? mbti,
     List<String> genres,
   ) async {
+    List<Movie> fallback;
     try {
-      final targetGenreIds = <int>{};
-
-      // 1. 선택한 선호 장르 ID 수집
-      for (final g in genres) {
-        if (_genreStringToId.containsKey(g)) {
-          targetGenreIds.add(_genreStringToId[g]!);
-        }
-      }
-
-      // 2. 선택한 MBTI 대표 장르 ID 추가
-      if (mbti != null &&
-          mbti != 'skipped' &&
-          mbti != 'NONE' &&
-          _mbtiGenreMap.containsKey(mbti)) {
-        targetGenreIds.add(_mbtiGenreMap[mbti]!);
-      }
-
-      // 3. 취향 정보가 전혀 없는 경우 (완전 스킵 유저) -> 대중적 인기 영화 추천
-      if (targetGenreIds.isEmpty) {
-        return await ApiService.getPopularMovies();
-      }
-
-      // 4. 취향 장르별 영화 조회 및 중복 제거 결합
-      final collectedMovies = <Movie>[];
-      final seenMovieIds = <int>{};
-
-      for (final genreId in targetGenreIds.take(3)) {
-        try {
-          final movies = await ApiService.getMoviesByGenre(genreId);
-          for (final m in movies) {
-            if (!seenMovieIds.contains(m.id)) {
-              seenMovieIds.add(m.id);
-              collectedMovies.add(m);
-            }
-          }
-        } catch (_) {}
-      }
-
-      if (collectedMovies.isNotEmpty) {
-        return collectedMovies;
-      }
-
-      // 에러 등으로 비어있는 경우 인기 영화로 안전 폴백
-      return await ApiService.getPopularMovies();
+      fallback = await ApiService.getPopularMovies();
     } catch (_) {
-      return await ApiService.getPopularMovies();
+      fallback = const [];
     }
+    final recommendation = await PersonalizedRecommendationService.load(
+      mbti: mbti,
+      genres: genres,
+      fallback: fallback,
+    );
+    return recommendation.movies;
   }
 
   // --- 설정 재설정 모달 다이얼로그 (참고 이미지 2) ---
@@ -180,20 +127,21 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                   onPressed: () async {
                     Navigator.of(dialogContext).pop();
 
-                    final currentMbtiInfo = (_userMbti != null &&
+                    final currentMbtiInfo =
+                        (_userMbti != null &&
                             _userMbti != 'NONE' &&
                             _userMbti != 'skipped')
                         ? (getMbtiInfoById(_userMbti!) ??
-                            const MbtiInfo(
-                              id: 'NONE',
-                              title: '',
-                              description: '',
-                              feature: '',
-                              recommendedGenres: '',
-                              genreIds: [],
-                              famousPeople: [],
-                              svgAsset: '',
-                            ))
+                              const MbtiInfo(
+                                id: 'NONE',
+                                title: '',
+                                description: '',
+                                feature: '',
+                                recommendedGenres: '',
+                                genreIds: [],
+                                famousPeople: [],
+                                svgAsset: '',
+                              ))
                         : const MbtiInfo(
                             id: 'NONE',
                             title: '',
@@ -210,11 +158,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                         builder: (_) => GenreSelectScreen(
                           mbtiInfo: currentMbtiInfo,
                           isResetMode: true,
+                          preferSavedGenres: true,
                         ),
                       ),
                     );
-
-                    _loadRecommendations();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF48C95F),
@@ -245,11 +192,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
 
                     await Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => const MbtiSelectScreen(),
+                        builder: (_) =>
+                            const MbtiSelectScreen(isResetMode: true),
                       ),
                     );
-
-                    _loadRecommendations();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6B4EE6),
@@ -279,11 +225,16 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   @override
   Widget build(BuildContext context) {
     // MBTI 표기 텍스트: MBTI가 선택되어 있으면 MBTI명, 스킵되었으면 skipped
-    final String mbtiDisplay = (_userMbti != null &&
-            _userMbti != 'NONE' &&
-            _userMbti != 'skipped')
-        ? _userMbti!
-        : 'skipped';
+    final hasMbti =
+        _userMbti != null && _userMbti != 'NONE' && _userMbti != 'skipped';
+    final genreDisplay = PersonalizedRecommendationService.genreNameFor(
+      mbti: _userMbti,
+      genres: _userGenres,
+    );
+    final preferenceDisplay = [
+      if (hasMbti) _userMbti!,
+      if (genreDisplay != null) genreDisplay,
+    ].join(' · ');
 
     return Scaffold(
       backgroundColor: const Color(0xFF16161A),
@@ -293,7 +244,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. 상단 헤더 (타이틀 + 재설정 버튼)
-              _buildHeader(context, mbtiDisplay),
+              _buildHeader(
+                context,
+                preferenceDisplay.isEmpty ? '설정 안 함' : preferenceDisplay,
+              ),
 
               // 2. 취향 저격 추천 영화 타이틀
               const Padding(
@@ -326,20 +280,25 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // 그라데이션 타이틀
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFF4EE3CE), Color(0xFF55C75A)],
-            ).createShader(bounds),
-            child: Text(
-              '당신의 취향저격! $mbtiDisplay',
-              style: const TextStyle(
-                fontSize: 22.0,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.5,
+          Expanded(
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Color(0xFF4EE3CE), Color(0xFF55C75A)],
+              ).createShader(bounds),
+              child: Text(
+                '당신의 취향저격! $mbtiDisplay',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 22.0,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 12),
           // ⚙ 재설정 버튼
           GestureDetector(
             onTap: () => _showResetDialog(context),
@@ -355,11 +314,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.settings,
-                    color: Colors.white70,
-                    size: 16.0,
-                  ),
+                  Icon(Icons.settings, color: Colors.white70, size: 16.0),
                   SizedBox(width: 5.0),
                   Text(
                     '재설정',

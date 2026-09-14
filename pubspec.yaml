@@ -45,6 +45,7 @@ dependencies:
   flutter_svg: ^2.3.0
   carousel_slider: ^5.1.2
   url_launcher: ^6.3.1
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -72,6 +73,8 @@ flutter:
     - assets/images/
     - assets/images/mbti/
     - assets/images/tier/
+    - assets/data/chatbot_movies.json
+    - config/
 
 
   # An image asset can refer to one or more resolution-specific "variants", see

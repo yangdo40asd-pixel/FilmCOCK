@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/mbti_select_screen.dart';
+import 'package:filmcock_app/presentation/screens/home/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,8 +13,93 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _completeSignIn() async {
+    await _settingsRepository.endGuestSession();
+    final onboarding = await _settingsRepository.loadOnboarding();
+    if (!mounted) return;
+    final completed = onboarding.isComplete;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) =>
+            completed ? const MainScreen() : const MbtiSelectScreen(),
+      ),
+    );
+  }
+
+  String _authErrorMessage(FirebaseAuthException error) {
+    return switch (error.code) {
+      'invalid-email' => '이메일 형식이 올바르지 않습니다.',
+      'invalid-credential' || 'wrong-password' => '이메일 또는 비밀번호를 확인해주세요.',
+      'user-not-found' => '등록되지 않은 계정입니다.',
+      'email-already-in-use' => '이미 사용 중인 이메일입니다.',
+      'weak-password' => '비밀번호는 6자 이상 입력해주세요.',
+      _ => '인증을 완료하지 못했습니다. 다시 시도해주세요.',
+    };
+  }
+
+  Future<void> _signInWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요.')));
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await _completeSignIn();
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_authErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _registerWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('이메일과 비밀번호를 입력해주세요.')));
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      await _completeSignIn();
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_authErrorMessage(error))));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   Future<void> _signInWithGoogle() async {
     try {
@@ -23,7 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       // 2. 구글 인증 정보 가져오기
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final OAuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -31,22 +119,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
       // 3. 파이어베이스 Auth로 로그인 처리
       await _auth.signInWithCredential(credential);
-
-      if (!mounted) return;
-      // 4. 로그인 성공 시 MBTI 화면으로 이동
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MbtiSelectScreen()),
-      );
+      await _completeSignIn();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('구글 로그인 실패: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('구글 로그인 실패: $e')));
     }
   }
 
-  void _skipLogin() {
+  Future<void> _skipLogin() async {
     // 비회원으로 시작하기: 즉시 MBTI 선택 화면으로 건너뜀
+    await _settingsRepository.startGuestSession();
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MbtiSelectScreen()),
     );
@@ -79,13 +164,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // 이메일 텍스트 필드
               _buildTextField(
+                controller: _emailController,
                 hintText: '이메일',
                 icon: Icons.mail_outline,
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 16),
 
               // 비밀번호 텍스트 필드
               _buildTextField(
+                controller: _passwordController,
                 hintText: '비밀번호',
                 icon: Icons.lock_outline,
                 isPassword: true,
@@ -94,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // 메인 로그인 버튼
               ElevatedButton(
-                onPressed: () {}, // 기본 로그인은 백엔드 연동 전까지 빈 함수로 둠
+                onPressed: _isSubmitting ? null : _signInWithEmail,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6A5ACD),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -102,21 +190,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
-                  '로그인',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        '로그인',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
               const SizedBox(height: 32),
 
               // '또는' 구분선
               Row(
                 children: [
-                  Expanded(child: Divider(color: Colors.grey.shade800, thickness: 1)),
+                  Expanded(
+                    child: Divider(color: Colors.grey.shade800, thickness: 1),
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
@@ -124,14 +223,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Colors.grey.shade500),
                     ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey.shade800, thickness: 1)),
+                  Expanded(
+                    child: Divider(color: Colors.grey.shade800, thickness: 1),
+                  ),
                 ],
               ),
               const SizedBox(height: 32),
 
               // 구글로 계속하기 버튼
               OutlinedButton(
-                onPressed: _signInWithGoogle,
+                onPressed: _isSubmitting ? null : _signInWithGoogle,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   side: BorderSide(color: Colors.grey.shade700),
@@ -153,10 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(width: 12),
                     Text(
                       'Google로 계속하기',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
+                      style: TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ],
                 ),
@@ -165,13 +263,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // 비회원으로 시작하기 (건너뛰기)
               TextButton(
-                onPressed: _skipLogin,
+                onPressed: _isSubmitting ? null : _skipLogin,
                 child: const Text(
                   '비회원으로 시작하기',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFF6A5ACD),
-                  ),
+                  style: TextStyle(fontSize: 15, color: Color(0xFF6A5ACD)),
                 ),
               ),
               const SizedBox(height: 60),
@@ -185,9 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                   ),
                   TextButton(
-                    onPressed: () {
-                      // 임시 보류
-                    },
+                    onPressed: _isSubmitting ? null : _registerWithEmail,
                     child: const Text(
                       '회원가입',
                       style: TextStyle(
@@ -207,9 +300,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // 텍스트 필드 컴포넌트 분리
-  Widget _buildTextField({required String hintText, required IconData icon, bool isPassword = false}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType? keyboardType,
+  }) {
     return TextField(
+      controller: controller,
       obscureText: isPassword,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         hintText: hintText,

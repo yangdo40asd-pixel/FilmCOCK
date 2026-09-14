@@ -9,6 +9,15 @@ import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Movie parsing tolerates optional TMDB fields', () {
+    final movie = Movie.fromJson({'id': 10, 'title': '테스트 영화'});
+
+    expect(movie.id, 10);
+    expect(movie.overview, isEmpty);
+    expect(movie.voteAverage, 0);
+    expect(movie.releaseDate, isEmpty);
+  });
+
   group('Person display filtering', () {
     test('accepts a Korean translated display name', () {
       final person = Person(

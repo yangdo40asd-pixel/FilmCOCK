@@ -1,16 +1,29 @@
 import 'package:filmcock_app/presentation/screens/chat/chat_screen.dart';
 import 'package:filmcock_app/core/theme/theme_controller.dart';
+import 'package:filmcock_app/core/utils/release_date_utils.dart';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:filmcock_app/data/services/home_prefetch_service.dart';
+import 'package:filmcock_app/data/services/preference_change_service.dart';
+import 'package:filmcock_app/data/services/daily_recommendation_service.dart';
+import 'package:filmcock_app/data/services/notification_settings_service.dart';
+import 'package:filmcock_app/data/services/personalized_recommendation_service.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
+import 'package:filmcock_app/data/storage/app_storage_keys.dart';
+import 'package:filmcock_app/core/config/secrets.dart';
+import 'package:filmcock_app/core/errors/app_exception.dart';
 import 'package:filmcock_app/presentation/widgets/section_header.dart';
+import 'package:filmcock_app/presentation/widgets/app_network_image.dart';
+import 'package:filmcock_app/presentation/widgets/app_loading_indicator.dart';
+import 'package:filmcock_app/presentation/widgets/home_external_sections.dart';
+import 'package:filmcock_app/presentation/controllers/home_controller.dart';
 import 'package:filmcock_app/presentation/screens/home/list_view_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,18 +34,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  static bool _hasShownUpcomingAlert = false;
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
 
   Future<void> _checkAndShowUpcomingAlert() async {
-    if (_hasShownUpcomingAlert) return;
-    _hasShownUpcomingAlert = true;
-
     final prefs = await SharedPreferences.getInstance();
-    final allPush = prefs.getBool('setting_all_push') ?? true;
-    final upcomingAlarm =
-        prefs.getBool('setting_upcoming_movie_alarm') ?? true;
-    if (!allPush || !upcomingAlarm) return;
+    final notificationSettings = await _settingsRepository.loadNotifications();
+    if (!notificationSettings.shouldShowUpcoming) return;
 
     try {
       final movies = await upcomingMovies;
@@ -49,10 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (movie.releaseDate.isNotEmpty) {
         try {
           final release = DateTime.parse(movie.releaseDate);
-          final now = DateTime.now();
-          final diff = DateTime(release.year, release.month, release.day)
-              .difference(DateTime(now.year, now.month, now.day))
-              .inDays;
+          final diff = ReleaseDateUtils.daysUntil(release);
           if (diff == 0) {
             dDayText = 'D-Day';
           } else if (diff > 0) {
@@ -64,6 +70,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       if (!mounted) return;
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final viewerId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+      final alertKey = '$viewerId:$today:${movie.id}';
+      if (prefs.getString(AppStorageKeys.lastUpcomingAlert) == alertKey) return;
+      await prefs.setString(AppStorageKeys.lastUpcomingAlert, alertKey);
+      if (!mounted) return;
       _showUpcomingDialog(movie, dDayText);
     } catch (_) {}
   }
@@ -73,16 +85,21 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final colors = Theme.of(ctx).colorScheme;
         return Dialog(
-          backgroundColor: const Color(0xFF222226),
+          backgroundColor: colors.surfaceContainerHigh,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24.0),
           ),
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40.0,
+            vertical: 24.0,
+          ),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 28.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 28.0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -104,10 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 18),
 
                 // Dialog Title
-                const Text(
+                Text(
                   '곧 개봉해요!',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: colors.onSurface,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -120,27 +137,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: SizedBox(
                     width: 170,
                     height: 240,
-                    child: movie.fullPosterUrl.isNotEmpty
-                        ? Image.network(
-                            movie.fullPosterUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (c, e, s) => Container(
-                              color: Colors.grey[800],
-                              child: const Icon(
-                                Icons.movie,
-                                color: Colors.white54,
-                                size: 40,
-                              ),
-                            ),
-                          )
-                        : Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.movie,
-                              color: Colors.white54,
-                              size: 40,
-                            ),
-                          ),
+                    child: AppNetworkImage(
+                      imageUrl: movie.fullPosterUrl,
+                      placeholderIconSize: 40,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -148,8 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Movie Title
                 Text(
                   movie.title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.onSurface,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -192,10 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         onPressed: () => Navigator.pop(ctx),
-                        child: const Text(
+                        child: Text(
                           '닫기',
                           style: TextStyle(
-                            color: Colors.white70,
+                            color: colors.onSurfaceVariant,
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
@@ -242,96 +242,210 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 배너 및 일반 영화
-  late Future<List<Movie>> popularMovies;
-  late Future<List<Movie>> randomMovies;
-  late Future<List<Movie>> upcomingMovies;
-  late Future<List<Movie>> nowPlayingMovies;
-  late Future<List<Movie>> animationMovies;
-  late Future<List<Movie>> topRatedMovies;
+  final HomeController _home = HomeController();
 
-  // 인물
-  Future<List<Person>>? popularKoreanActors;
-  late Future<List<Person>> popularForeignActors;
-  Future<List<Person>>? popularKoreanDirectors;
-
-  String _userMbti = '추천영화'; // 기본값
-  bool _isHomeReady = false;
+  Future<List<Movie>> get popularMovies => _home.popularMovies;
+  set popularMovies(Future<List<Movie>> value) => _home.popularMovies = value;
+  Future<List<Movie>> get randomMovies => _home.randomMovies;
+  set randomMovies(Future<List<Movie>> value) => _home.randomMovies = value;
+  Future<List<Movie>> get upcomingMovies => _home.upcomingMovies;
+  set upcomingMovies(Future<List<Movie>> value) => _home.upcomingMovies = value;
+  Future<List<Movie>> get nowPlayingMovies => _home.nowPlayingMovies;
+  set nowPlayingMovies(Future<List<Movie>> value) =>
+      _home.nowPlayingMovies = value;
+  Future<List<Movie>> get animationMovies => _home.animationMovies;
+  set animationMovies(Future<List<Movie>> value) =>
+      _home.animationMovies = value;
+  Future<List<Movie>> get topRatedMovies => _home.topRatedMovies;
+  set topRatedMovies(Future<List<Movie>> value) => _home.topRatedMovies = value;
+  Future<List<Person>>? get popularKoreanActors => _home.popularKoreanActors;
+  set popularKoreanActors(Future<List<Person>>? value) =>
+      _home.popularKoreanActors = value;
+  Future<List<Person>> get popularForeignActors => _home.popularForeignActors;
+  set popularForeignActors(Future<List<Person>> value) =>
+      _home.popularForeignActors = value;
+  Future<List<Person>>? get popularKoreanDirectors =>
+      _home.popularKoreanDirectors;
+  set popularKoreanDirectors(Future<List<Person>>? value) =>
+      _home.popularKoreanDirectors = value;
+  String get _userMbti => _home.userMbti;
+  set _userMbti(String value) => _home.userMbti = value;
+  List<String> _userGenres = const [];
+  String _personalizationLabel = '';
+  int get _homeLoadId => _home.loadId;
 
   @override
   void initState() {
     super.initState();
-    final cachedData = HomePrefetchService.cachedData;
-    if (cachedData != null) {
-      _applyHomeData(cachedData);
-      _isHomeReady = true;
-      _loadMbti();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _checkAndShowUpcomingAlert();
-      });
-    } else {
-      _prepareHome();
-    }
+    WidgetsBinding.instance.addObserver(this);
+    PreferenceChangeService.revision.addListener(_handlePreferenceChange);
+    NotificationSettingsService.revision.addListener(
+      _handleNotificationSettingChange,
+    );
+    _loadMbti(_homeLoadId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowUpcomingAlert();
+    });
   }
 
-  Future<void> _prepareHome() async {
-    try {
-      final data = await HomePrefetchService.load();
-      _applyHomeData(data);
-      final prefs = await SharedPreferences.getInstance();
-      _userMbti = prefs.getString('user_mbti') ?? '추천영화';
-    } catch (_) {
-      popularMovies = Future.value(const []);
-      randomMovies = Future.value(const []);
-      upcomingMovies = Future.value(const []);
-      nowPlayingMovies = Future.value(const []);
-      animationMovies = Future.value(const []);
-      topRatedMovies = Future.value(const []);
-      popularForeignActors = Future.value(const []);
-      popularKoreanActors = Future.value(const []);
-      popularKoreanDirectors = Future.value(const []);
-    } finally {
-      if (mounted) {
-        setState(() => _isHomeReady = true);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _checkAndShowUpcomingAlert();
-        });
-      }
-    }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    PreferenceChangeService.revision.removeListener(_handlePreferenceChange);
+    NotificationSettingsService.revision.removeListener(
+      _handleNotificationSettingChange,
+    );
+    super.dispose();
   }
 
-  void _applyHomeData(HomePrefetchData data) {
-    popularMovies = Future.value(data.popularMovies);
-    randomMovies = Future.value(data.randomMovies);
-    upcomingMovies = Future.value(data.upcomingMovies);
-    nowPlayingMovies = Future.value(data.nowPlayingMovies);
-    animationMovies = Future.value(data.animationMovies);
-    topRatedMovies = Future.value(data.classicMovies);
-    popularForeignActors = Future.value(data.foreignActors);
-    popularKoreanActors = Future.value(data.koreanActors);
-    popularKoreanDirectors = Future.value(data.koreanDirectors);
+  void _handlePreferenceChange() {
+    _loadMbti(_home.nextLoad());
   }
 
-  Future<void> _loadMbti() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _handleNotificationSettingChange() {
+    _checkAndShowUpcomingAlert();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    if (!_home.moveToTodayIfNeeded()) return;
+    _refreshHome();
+  }
+
+  Future<void> _refreshHome() async {
+    final session = _home.refresh();
     if (!mounted) return;
-    setState(() => _userMbti = prefs.getString('user_mbti') ?? '추천영화');
+    setState(() {});
+    _loadMbti(_homeLoadId);
+
+    try {
+      final data = await session.completed;
+      if (!mounted) return;
+      if (!data.isComplete) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('일부 홈 데이터를 불러오지 못했습니다.')));
+      }
+      await _checkAndShowUpcomingAlert();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('홈 데이터를 새로고침하지 못했습니다.')));
+    }
+  }
+
+  void _retryPopularMovies() {
+    setState(() {
+      popularMovies = HomePrefetchService.fetchPopularMovies();
+    });
+  }
+
+  void _retryRandomMovies() {
+    setState(() {
+      _home.nextLoad();
+      randomMovies = HomePrefetchService.fetchPopularMovies().then((movies) {
+        final fallback = DailyRecommendationService.orderMovies(movies);
+        return _loadPersonalizedMovies(_userMbti, _userGenres, fallback);
+      });
+    });
+  }
+
+  void _retryUpcomingMovies() {
+    final retry = HomePrefetchService.fetchUpcomingMovies();
+    setState(() {
+      upcomingMovies = retry;
+    });
+    retry.then((_) => _checkAndShowUpcomingAlert()).catchError((_) {});
+  }
+
+  void _retryNowPlayingMovies() {
+    setState(() {
+      nowPlayingMovies = HomePrefetchService.fetchNowPlayingMovies();
+    });
+  }
+
+  void _retryAnimationMovies() {
+    setState(() {
+      animationMovies = HomePrefetchService.fetchAnimationMovies();
+    });
+  }
+
+  void _retryClassicMovies() {
+    setState(() {
+      topRatedMovies = HomePrefetchService.fetchClassicMovies();
+    });
+  }
+
+  void _retryKoreanActors() {
+    setState(() {
+      popularKoreanActors = HomePrefetchService.fetchKoreanActors();
+    });
+  }
+
+  void _retryForeignActors() {
+    setState(() {
+      popularForeignActors = HomePrefetchService.fetchForeignActors();
+    });
+  }
+
+  void _retryKoreanDirectors() {
+    setState(() {
+      popularKoreanDirectors = HomePrefetchService.fetchKoreanDirectors();
+    });
+  }
+
+  Future<void> _loadMbti(int loadId) async {
+    final preferences = await Future.wait<Object?>([
+      _settingsRepository.loadMbti(),
+      _settingsRepository.loadGenres(),
+    ]);
+    final savedMbti = preferences[0] as String?;
+    final genres = preferences[1] as List<String>;
+    final mbti = savedMbti ?? '추천영화';
+    List<Movie> fallback;
+    try {
+      fallback = await randomMovies;
+    } catch (_) {
+      fallback = const <Movie>[];
+    }
+    if (!mounted || loadId != _homeLoadId) return;
+    setState(() {
+      _userMbti = mbti;
+      _userGenres = genres;
+      _personalizationLabel = savedMbti ?? '';
+    });
+
+    final personalized = await _loadPersonalizedMovies(
+      savedMbti,
+      genres,
+      fallback,
+    );
+    if (!mounted || loadId != _homeLoadId) return;
+    setState(() {
+      randomMovies = Future.value(personalized);
+    });
+  }
+
+  Future<List<Movie>> _loadPersonalizedMovies(
+    String? mbti,
+    List<String> genres,
+    List<Movie> fallback,
+  ) async {
+    final recommendation = await PersonalizedRecommendationService.load(
+      mbti: mbti,
+      genres: genres,
+      fallback: fallback,
+    );
+    return recommendation.movies;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isHomeReady) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF1E1E2E),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF8B5CF6)),
-        ),
-      );
-    }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF7F7FA);
-    final titleColor = isDark ? Colors.white : const Color(0xFF191919);
+    final colors = Theme.of(context).colorScheme;
+    final bgColor = colors.surface;
+    final titleColor = colors.onSurface;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -362,7 +476,9 @@ class _HomeScreenState extends State<HomeScreen> {
               final isCurrentDark = mode == ThemeMode.dark;
               return IconButton(
                 icon: Icon(
-                  isCurrentDark ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+                  isCurrentDark
+                      ? Icons.nightlight_round
+                      : Icons.wb_sunny_rounded,
                   color: isCurrentDark ? Colors.white : const Color(0xFFF59E0B),
                 ),
                 tooltip: isCurrentDark ? '라이트 모드로 전환' : '다크 모드로 전환',
@@ -375,260 +491,274 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: '영화 추천 도슨트 열기',
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (_) => const ChatScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const ChatScreen()),
           );
         },
-        backgroundColor: const Color(0xFF8B5CF6),
+        backgroundColor: colors.primary,
         child: const Icon(Icons.chat_bubble, color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // 2. 자동 교체 스크린 (Hero Banner)
-            _buildMovieSection(
-              future: popularMovies,
-              builder: (movies) => _buildHeroCarousel(movies),
-            ),
-            const SizedBox(height: 24.0),
-
-            // 3. 오늘의 랜덤 추천 영화 🍿
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title:
-                    (_userMbti == 'NONE' ||
-                        _userMbti.isEmpty ||
-                        _userMbti == 'skipped' ||
-                        _userMbti == '추천영화')
-                    ? '오늘의 랜덤 추천 영화'
-                    : '오늘의 추천 영화 ($_userMbti)',
-                emoji: '🍿',
-                onTap: () async {
-                  final movies = await randomMovies;
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ListViewScreen(title: '오늘의 랜덤 추천 영화', items: movies),
-                    ),
-                  );
-                },
+      body: RefreshIndicator(
+        onRefresh: _refreshHome,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              if (!ApiSecrets.hasTmdbCredentials || !ApiSecrets.hasKoficApiKey)
+                _buildApiConfigurationNotice(),
+              // 2. 자동 교체 스크린 (Hero Banner)
+              _buildMovieSection(
+                future: popularMovies,
+                onRetry: _retryPopularMovies,
+                builder: (movies) => _buildHeroCarousel(movies),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildMovieSection(
-              future: randomMovies,
-              builder: (movies) =>
-                  _buildMovieHorizontalList(context, movies: movies),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 24.0),
 
-            // 4. 방영 예정일 영화 📅
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '방영 예정일 영화',
-                emoji: '📅',
-                onTap: () async {
-                  final movies = await upcomingMovies;
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ListViewScreen(title: '방영 예정일 영화', items: movies),
-                    ),
-                  );
-                },
+              // 3. 오늘의 랜덤 추천 영화 🍿
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: _personalizationLabel.isEmpty
+                      ? '오늘의 추천 영화'
+                      : '오늘의 추천 영화 ($_personalizationLabel)',
+                  emoji: '🍿',
+                  onTap: () async {
+                    final movies = await randomMovies;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListViewScreen.movies(
+                          title: _personalizationLabel.isEmpty
+                              ? '오늘의 추천 영화'
+                              : '오늘의 추천 영화 ($_personalizationLabel)',
+                          movies: movies,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildMovieSection(
-              future: upcomingMovies,
-              builder: (movies) =>
-                  _buildUpcomingMoviesList(context, movies: movies),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildMovieSection(
+                future: randomMovies,
+                onRetry: _retryRandomMovies,
+                builder: (movies) =>
+                    _buildMovieHorizontalList(context, movies: movies),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 5. 최신 상영 영화 📽️
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '최신 상영 영화',
-                emoji: '📽️',
-                onTap: () async {
-                  final movies = await nowPlayingMovies;
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ListViewScreen(title: '최신 상영 영화', items: movies),
-                    ),
-                  );
-                },
+              // 4. 방영 예정일 영화 📅
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '방영 예정일 영화',
+                  emoji: '📅',
+                  onTap: () async {
+                    final movies = await upcomingMovies;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListViewScreen.movies(
+                          title: '방영 예정일 영화',
+                          movies: movies,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildMovieSection(
-              future: nowPlayingMovies,
-              builder: (movies) =>
-                  _buildMovieHorizontalList(context, movies: movies),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildMovieSection(
+                future: upcomingMovies,
+                onRetry: _retryUpcomingMovies,
+                builder: (movies) =>
+                    _buildUpcomingMoviesList(context, movies: movies),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 6. 애니메이션 🦄
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '애니메이션',
-                emoji: '🦄',
-                onTap: () async {
-                  final movies = await animationMovies;
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ListViewScreen(title: '애니메이션', items: movies),
-                    ),
-                  );
-                },
+              // 5. 최신 상영 영화 📽️
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '최신 상영 영화',
+                  emoji: '📽️',
+                  onTap: () async {
+                    final movies = await nowPlayingMovies;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListViewScreen.movies(
+                          title: '최신 상영 영화',
+                          movies: movies,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildMovieSection(
-              future: animationMovies,
-              builder: (movies) =>
-                  _buildMovieHorizontalList(context, movies: movies),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildMovieSection(
+                future: nowPlayingMovies,
+                onRetry: _retryNowPlayingMovies,
+                builder: (movies) =>
+                    _buildMovieHorizontalList(context, movies: movies),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 7. 고전 명작 👍
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '고전 명작',
-                emoji: '👍',
-                onTap: () async {
-                  final movies = await topRatedMovies;
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ListViewScreen(title: '고전 명작', items: movies),
-                    ),
-                  );
-                },
+              // 6. 애니메이션 🦄
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '애니메이션',
+                  emoji: '🦄',
+                  onTap: () async {
+                    final movies = await animationMovies;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListViewScreen.movies(
+                          title: '애니메이션',
+                          movies: movies,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildMovieSection(
-              future: topRatedMovies,
-              builder: (movies) =>
-                  _buildMovieHorizontalList(context, movies: movies),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildMovieSection(
+                future: animationMovies,
+                onRetry: _retryAnimationMovies,
+                builder: (movies) =>
+                    _buildMovieHorizontalList(context, movies: movies),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 8. 한국 배우 🇰🇷
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '한국 배우',
-                emoji: '🇰🇷',
-                onTap: () async {
-                  final actors = await popularKoreanActors;
-                  if (!context.mounted) return;
-                  if (actors != null && actors.isNotEmpty) {
-                    _navigateToListScreen(context, '한국 배우', actors);
-                  }
-                },
+              // 7. 고전 명작 👍
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '고전 명작',
+                  emoji: '👍',
+                  onTap: () async {
+                    final movies = await topRatedMovies;
+                    if (!context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListViewScreen.movies(
+                          title: '고전 명작',
+                          movies: movies,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildPersonSection(
-              future: popularKoreanActors ?? Future.value([]),
-              builder: (persons) =>
-                  _buildPersonHorizontalList(context, persons: persons),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildMovieSection(
+                future: topRatedMovies,
+                onRetry: _retryClassicMovies,
+                builder: (movies) =>
+                    _buildMovieHorizontalList(context, movies: movies),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 9. 해외 배우 🌟
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '해외 배우',
-                emoji: '🌟',
-                onTap: () async {
-                  final actors = await popularForeignActors;
-                  if (!context.mounted) return;
-                  if (actors.isNotEmpty) {
-                    _navigateToListScreen(context, '해외 배우', actors);
-                  }
-                },
+              // 8. 한국 배우 🇰🇷
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '한국 배우',
+                  emoji: '🇰🇷',
+                  onTap: () async {
+                    final actors = await popularKoreanActors;
+                    if (!context.mounted) return;
+                    if (actors != null && actors.isNotEmpty) {
+                      _navigateToListScreen(context, '한국 배우', actors);
+                    }
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildPersonSection(
-              future: popularForeignActors,
-              builder: (persons) =>
-                  _buildPersonHorizontalList(context, persons: persons),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 12.0),
+              _buildPersonSection(
+                future: popularKoreanActors ?? Future.value([]),
+                onRetry: _retryKoreanActors,
+                builder: (persons) =>
+                    _buildPersonHorizontalList(context, persons: persons),
+              ),
+              const SizedBox(height: 24.0),
 
-            // 10. 유명 감독 🎬
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '유명 감독',
-                emoji: '🎬',
-                onTap: () async {
-                  final directors = await popularKoreanDirectors;
-                  if (!context.mounted) return;
-                  if (directors != null && directors.isNotEmpty) {
-                    _navigateToListScreen(context, '유명 감독', directors);
-                  }
-                },
+              // 9. 해외 배우 🌟
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '해외 배우',
+                  emoji: '🌟',
+                  onTap: () async {
+                    final actors = await popularForeignActors;
+                    if (!context.mounted) return;
+                    if (actors.isNotEmpty) {
+                      _navigateToListScreen(context, '해외 배우', actors);
+                    }
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildPersonSection(
-              future: popularKoreanDirectors ?? Future.value([]),
-              builder: (persons) => _buildPersonHorizontalList(
-                context,
-                persons: persons,
-                isDirector: true,
+              const SizedBox(height: 12.0),
+              _buildPersonSection(
+                future: popularForeignActors,
+                onRetry: _retryForeignActors,
+                builder: (persons) =>
+                    _buildPersonHorizontalList(context, persons: persons),
               ),
-            ),
-            const SizedBox(height: 24.0),
+              const SizedBox(height: 24.0),
 
-            // 11. 리뷰 채널 🎤
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SectionHeader(
-                title: '리뷰 채널',
-                emoji: '🎤',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('리뷰 채널 목록은 준비 중입니다.')),
-                  );
-                },
+              // 10. 유명 감독 🎬
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(
+                  title: '유명 감독',
+                  emoji: '🎬',
+                  onTap: () async {
+                    final directors = await popularKoreanDirectors;
+                    if (!context.mounted) return;
+                    if (directors != null && directors.isNotEmpty) {
+                      _navigateToListScreen(context, '유명 감독', directors);
+                    }
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 12.0),
-            _buildReviewChannelList(),
-            const SizedBox(height: 20.0),
-            _buildKoficBanner(context),
+              const SizedBox(height: 12.0),
+              _buildPersonSection(
+                future: popularKoreanDirectors ?? Future.value([]),
+                onRetry: _retryKoreanDirectors,
+                builder: (persons) => _buildPersonHorizontalList(
+                  context,
+                  persons: persons,
+                  isDirector: true,
+                ),
+              ),
+              const SizedBox(height: 24.0),
 
-            const SizedBox(height: 40.0),
-          ],
+              // 11. 리뷰 채널 🎤
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: SectionHeader(title: '리뷰 채널', emoji: '🎤', onTap: null),
+              ),
+              const SizedBox(height: 12.0),
+              const ReviewChannelsSection(),
+              const SizedBox(height: 20.0),
+              const KoficBanner(),
+
+              const SizedBox(height: 40.0),
+            ],
+          ),
         ),
       ),
     );
@@ -638,6 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildMovieSection({
     required Future<List<Movie>> future,
+    required VoidCallback onRetry,
     required Widget Function(List<Movie>) builder,
   }) {
     return FutureBuilder<List<Movie>>(
@@ -646,16 +777,26 @@ class _HomeScreenState extends State<HomeScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 180,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        } else if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.isEmpty) {
-          return const SizedBox(
-            height: 180,
             child: Center(
-              child: Text('데이터 없음', style: TextStyle(color: Colors.white54)),
+              child: AppLoadingIndicator(label: '배우 목록을 불러오는 중입니다.'),
             ),
+          );
+        }
+        if (snapshot.hasError) {
+          return _buildSectionStatus(
+            height: 180,
+            message: userMessageForError(
+              snapshot.error,
+              fallback: '영화 정보를 불러오지 못했습니다.',
+            ),
+            onRetry: onRetry,
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildSectionStatus(
+            height: 180,
+            message: '표시할 영화가 없습니다.',
+            onRetry: onRetry,
           );
         }
         return builder(snapshot.data!);
@@ -665,6 +806,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPersonSection({
     required Future<List<Person>> future,
+    required VoidCallback onRetry,
     required Widget Function(List<Person>) builder,
   }) {
     return FutureBuilder<List<Person>>(
@@ -673,16 +815,26 @@ class _HomeScreenState extends State<HomeScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
             height: 140,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        } else if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.isEmpty) {
-          return const SizedBox(
-            height: 140,
             child: Center(
-              child: Text('인물 정보 없음', style: TextStyle(color: Colors.white54)),
+              child: AppLoadingIndicator(label: '감독 목록을 불러오는 중입니다.'),
             ),
+          );
+        }
+        if (snapshot.hasError) {
+          return _buildSectionStatus(
+            height: 140,
+            message: userMessageForError(
+              snapshot.error,
+              fallback: '인물 정보를 불러오지 못했습니다.',
+            ),
+            onRetry: onRetry,
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildSectionStatus(
+            height: 140,
+            message: '표시할 인물 정보가 없습니다.',
+            onRetry: onRetry,
           );
         }
         return builder(snapshot.data!);
@@ -690,14 +842,42 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildSectionStatus({
+    required double height,
+    required String message,
+    required VoidCallback onRetry,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      child: SizedBox(
+        height: height,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(message, style: TextStyle(color: colors.onSurfaceVariant)),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _navigateToListScreen(
     BuildContext context,
     String title,
-    List<dynamic> items,
+    List<Person> people,
   ) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ListViewScreen(title: title, items: items),
+        builder: (_) => ListViewScreen.people(title: title, people: people),
       ),
     );
   }
@@ -715,18 +895,17 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                movie.fullBackdropUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (c, e, s) => Container(color: Colors.grey),
-              ),
+              AppNetworkImage(imageUrl: movie.fullBackdropUrl),
               // 그라데이션 오버레이
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withValues(alpha: 0.9), Colors.transparent],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.9),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
@@ -773,6 +952,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildApiConfigurationNotice() {
+    final colors = Theme.of(context).colorScheme;
+    final missing = <String>[
+      if (!ApiSecrets.hasTmdbCredentials) 'TMDB',
+      if (!ApiSecrets.hasKoficApiKey) 'KOFIC',
+    ].join('·');
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.key_off_outlined, color: colors.onErrorContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$missing 연결 설정이 없습니다. config/api_keys.json에 발급 키를 입력하고 앱을 다시 시작해주세요.',
+              style: TextStyle(color: colors.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMovieHorizontalList(
     BuildContext context, {
     required List<Movie> movies,
@@ -801,12 +1010,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8.0),
-                        child: Image.network(
-                          movie.fullPosterUrl,
-                          fit: BoxFit.cover,
+                        child: AppNetworkImage(
+                          imageUrl: movie.fullPosterUrl,
                           width: double.infinity,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(color: Colors.grey[800]),
                         ),
                       ),
                     ),
@@ -849,7 +1055,7 @@ class _HomeScreenState extends State<HomeScreen> {
           try {
             if (movie.releaseDate.isNotEmpty) {
               final release = DateTime.parse(movie.releaseDate);
-              dDay = release.difference(DateTime.now()).inDays;
+              dDay = ReleaseDateUtils.daysUntil(release);
             }
           } catch (_) {}
 
@@ -871,13 +1077,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
-                            child: Image.network(
-                              movie.fullPosterUrl,
-                              fit: BoxFit.cover,
+                            child: AppNetworkImage(
+                              imageUrl: movie.fullPosterUrl,
                               width: double.infinity,
                               height: double.infinity,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(color: Colors.grey[800]),
                             ),
                           ),
                           if (dDay > 0)
@@ -992,222 +1195,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  Widget _buildReviewChannelList() {
-    final channels = [
-      ReviewChannel(
-        name: '단군',
-        logoAsset: 'assets/images/dangun.png',
-        youtubeUrl: 'https://www.youtube.com/@kimdangun',
-      ),
-      ReviewChannel(
-        name: '리뷰마스터',
-        logoAsset: 'assets/images/review_master.jpg',
-        youtubeUrl: 'https://www.youtube.com/@review.master',
-      ),
-      ReviewChannel(
-        name: '지무비',
-        logoAsset: 'assets/images/gmovie.webp',
-        youtubeUrl: 'https://www.youtube.com/@gmovie',
-      ),
-      ReviewChannel(
-        name: '고몽',
-        logoAsset: 'assets/images/gomong.png',
-        youtubeUrl: 'https://www.youtube.com/@gomong',
-      ),
-      ReviewChannel(
-        name: '김시선',
-        logoAsset: 'assets/images/siseon.webp',
-        youtubeUrl: 'https://www.youtube.com/@siseon',
-      ),
-      ReviewChannel(
-        name: '달빛뮤즈',
-        logoAsset: 'assets/images/moonlightmuse.webp',
-        youtubeUrl: 'https://www.youtube.com/@moonlightmuse',
-      ),
-      ReviewChannel(
-        name: '삐맨',
-        logoAsset: 'assets/images/bman.webp',
-        youtubeUrl: 'https://www.youtube.com/@BMan',
-      ),
-    ];
-
-    final fallbackColors = [
-      Colors.deepOrange,
-      Colors.amber,
-      Colors.blue,
-      Colors.green,
-      Colors.purple,
-      Colors.teal,
-    ];
-
-    return SizedBox(
-      height: 120.0,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: channels.length,
-        itemBuilder: (context, index) {
-          final channel = channels[index];
-          final fallbackColor = fallbackColors[index % fallbackColors.length];
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 12.0),
-            child: GestureDetector(
-              onTap: () async {
-                if (channel.youtubeUrl.isNotEmpty) {
-                  final uri = Uri.parse(channel.youtubeUrl);
-                  try {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } catch (_) {
-                    await launchUrl(uri, mode: LaunchMode.platformDefault);
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('리뷰 채널 링크를 준비 중입니다.')),
-                  );
-                }
-              },
-              child: SizedBox(
-                width: 90.0,
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16.0),
-                        child: channel.logoAsset != null
-                            ? Image.asset(
-                                channel.logoAsset!,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                  width: double.infinity,
-                                  color: fallbackColor,
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.play_circle_fill,
-                                      size: 40,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                width: double.infinity,
-                                color: fallbackColor,
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.play_circle_fill,
-                                    size: 40,
-                                    color: Colors.white54,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    Text(
-                      channel.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.0,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildKoficBanner(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: InkWell(
-        onTap: () async {
-          final uri = Uri.parse('https://www.kobis.or.kr');
-          try {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } catch (_) {
-            await launchUrl(uri, mode: LaunchMode.platformDefault);
-          }
-        },
-        borderRadius: BorderRadius.circular(16.0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-          decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? const Color(0xFF282932)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(16.0),
-            border: Theme.of(context).brightness == Brightness.dark
-                ? Border.all(color: Colors.white12)
-                : Border.all(color: Colors.black12),
-          ),
-          child: Row(
-            children: [
-              // 영화 슬레이트 아이콘
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.movie_creation_outlined,
-                    color: Colors.white70,
-                    size: 28,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14.0),
-              // 중앙 KOFIC 및 영화진흥위원회 텍스트
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'KOFIC',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 4.0),
-                    Text(
-                      '영화진흥위원회',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13.0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // 우측 보라색 버튼
-              // 외부 링크 안내 아이콘
-              const Icon(
-                Icons.open_in_new_rounded,
-                color: Colors.white54,
-                size: 22,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
 }

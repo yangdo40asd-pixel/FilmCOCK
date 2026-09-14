@@ -1,0 +1,5 @@
+{
+  "TMDB_API_KEY": "replace-with-your-tmdb-api-key",
+  "TMDB_READ_ACCESS_TOKEN": "replace-with-your-tmdb-read-token",
+  "KOFIC_API_KEY": "replace-with-your-kofic-api-key"
+}

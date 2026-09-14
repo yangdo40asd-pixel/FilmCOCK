@@ -18,7 +18,9 @@ class MbtiCategory {
 }
 
 class MbtiPanelScreen extends StatefulWidget {
-  const MbtiPanelScreen({super.key});
+  final bool isResetMode;
+
+  const MbtiPanelScreen({super.key, this.isResetMode = false});
 
   @override
   State<MbtiPanelScreen> createState() => _MbtiPanelScreenState();
@@ -79,7 +81,9 @@ class _MbtiPanelScreenState extends State<MbtiPanelScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: Column(
           children: [
-            ...displayedCategories.map((category) => _buildCategoryPanel(context, category)),
+            ...displayedCategories.map(
+              (category) => _buildCategoryPanel(context, category),
+            ),
             const SizedBox(height: 8.0),
             // '16개 성격 유형 모두 보기' 토글 버튼
             Center(
@@ -91,7 +95,10 @@ class _MbtiPanelScreenState extends State<MbtiPanelScreen> {
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 14.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 14.0,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1F1F28),
                     borderRadius: BorderRadius.circular(12.0),
@@ -159,10 +166,7 @@ class _MbtiPanelScreenState extends State<MbtiPanelScreen> {
           // 서브타이틀
           Text(
             category.subtitle,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFFA0A0AB),
-            ),
+            style: const TextStyle(fontSize: 14, color: Color(0xFFA0A0AB)),
           ),
           const SizedBox(height: 18),
           // 각 MBTI 항목 목록
@@ -237,19 +241,28 @@ class _MbtiPanelScreenState extends State<MbtiPanelScreen> {
           const SizedBox(width: 8),
           // 우측 [보기] 버튼
           OutlinedButton(
-            onPressed: () {
-              Navigator.of(context).push(
+            onPressed: () async {
+              final changed = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
-                  builder: (_) => MbtiDetailScreen(mbtiInfo: mbti),
+                  builder: (_) => MbtiDetailScreen(
+                    mbtiInfo: mbti,
+                    isResetMode: widget.isResetMode,
+                  ),
                 ),
               );
+              if (changed == true && context.mounted && widget.isResetMode) {
+                Navigator.of(context).pop(true);
+              }
             },
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFF6B4EE6), width: 1.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.0),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
               backgroundColor: const Color(0xFF1E1E28),
             ),
             child: const Text(

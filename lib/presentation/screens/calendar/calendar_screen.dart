@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/calendar/calendar_add_movie_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
+import 'package:filmcock_app/data/repositories/calendar_repository.dart';
+import 'package:filmcock_app/data/repositories/activity_repository.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -13,6 +13,8 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  final CalendarRepository _calendarRepository = const CalendarRepository();
+  final ActivityRepository _activityRepository = const ActivityRepository();
   late int _selectedYear;
   late int _selectedMonth;
 
@@ -29,23 +31,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _loadCalendarData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawJson = prefs.getString('calendar_movies_data');
+    final stored = await _calendarRepository.load();
     final Map<String, List<Map<String, dynamic>>> parsed = {};
-
-    if (rawJson != null && rawJson.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
-        decoded.forEach((dateKey, list) {
-          if (list is List) {
-            parsed[dateKey] = list
-                .whereType<Map<String, dynamic>>()
-                .map((m) => Map<String, dynamic>.from(m))
-                .toList();
-          }
-        });
-      } catch (_) {}
-    }
+    stored.forEach((dateKey, list) {
+      if (list is List) {
+        parsed[dateKey] = list
+            .whereType<Map<String, dynamic>>()
+            .map(Map<String, dynamic>.from)
+            .toList();
+      }
+    });
 
     // Also link watched_movies_data to today if calendar is empty
     final now = DateTime.now();
@@ -53,23 +48,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
     if (parsed.isEmpty) {
-      final rawWatched = prefs.getStringList('watched_movies_data') ?? [];
-      if (rawWatched.isNotEmpty) {
+      final watched = await _activityRepository.watchedMovies();
+      if (watched.isNotEmpty) {
         final initialList = <Map<String, dynamic>>[];
-        for (final item in rawWatched) {
-          try {
-            final m = jsonDecode(item) as Map<String, dynamic>;
-            initialList.add({
-              'id': m['id'],
-              'title': m['title'],
-              'posterPath': m['posterPath'],
-              'addedAt': now.toIso8601String(),
-            });
-          } catch (_) {}
+        for (final movie in watched) {
+          initialList.add({
+            'id': movie['id'],
+            'title': movie['title'],
+            'posterPath': movie['posterPath'],
+            'addedAt': now.toIso8601String(),
+          });
         }
         if (initialList.isNotEmpty) {
           parsed[todayKey] = initialList;
-          await prefs.setString('calendar_movies_data', jsonEncode(parsed));
+          await _calendarRepository.save(parsed);
         }
       }
     }
@@ -119,6 +111,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.grey),
+                    tooltip: '닫기',
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -150,14 +143,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   width: 44,
                                   height: 60,
                                   color: Colors.grey[800],
-                                  child: const Icon(Icons.movie, color: Colors.white54),
+                                  child: const Icon(
+                                    Icons.movie,
+                                    color: Colors.white54,
+                                  ),
                                 ),
                               )
                             : Container(
                                 width: 44,
                                 height: 60,
                                 color: Colors.grey[800],
-                                child: const Icon(Icons.movie, color: Colors.white54),
+                                child: const Icon(
+                                  Icons.movie,
+                                  color: Colors.white54,
+                                ),
                               ),
                       ),
                       const SizedBox(width: 12),
@@ -222,7 +221,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     final now = DateTime.now();
     final daysInMonth = _getDaysInMonth(_selectedYear, _selectedMonth);
-    final firstWeekdayOffset = _getFirstWeekdayOffset(_selectedYear, _selectedMonth);
+    final firstWeekdayOffset = _getFirstWeekdayOffset(
+      _selectedYear,
+      _selectedMonth,
+    );
     final totalCells = firstWeekdayOffset + daysInMonth;
 
     // Available years: past 2 years up to current year
@@ -239,6 +241,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip: '뒤로 가기',
           onPressed: () => Navigator.pop(context),
         ),
         title: DropdownButtonHideUnderline(
@@ -283,7 +286,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               itemBuilder: (context, index) {
                 final month = index + 1;
                 final isSelected = month == _selectedMonth;
-                final isFutureMonth = _selectedYear > now.year ||
+                final isFutureMonth =
+                    _selectedYear > now.year ||
                     (_selectedYear == now.year && month > now.month);
 
                 return GestureDetector(
@@ -293,14 +297,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           setState(() => _selectedMonth = month);
                         },
                   child: Container(
-                    margin: const EdgeInsets.only(right: 8.0, top: 6.0, bottom: 6.0),
+                    margin: const EdgeInsets.only(
+                      right: 8.0,
+                      top: 6.0,
+                      bottom: 6.0,
+                    ),
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     decoration: BoxDecoration(
                       color: isFutureMonth
                           ? Colors.transparent
                           : (isSelected
-                              ? const Color(0xFF282832)
-                              : Colors.transparent),
+                                ? const Color(0xFF282832)
+                                : Colors.transparent),
                       borderRadius: BorderRadius.circular(20.0),
                       border: Border.all(
                         color: isFutureMonth
@@ -317,7 +325,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ? Colors.white24
                             : (isSelected ? Colors.white : Colors.grey[500]),
                         fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -368,30 +378,36 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: totalCells,
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 7,
-                        childAspectRatio: 0.68,
-                        crossAxisSpacing: 4,
-                        mainAxisSpacing: 8,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 7,
+                            childAspectRatio: 0.68,
+                            crossAxisSpacing: 4,
+                            mainAxisSpacing: 8,
+                          ),
                       itemBuilder: (context, index) {
                         if (index < firstWeekdayOffset) {
                           return const SizedBox.shrink();
                         }
 
                         final day = index - firstWeekdayOffset + 1;
-                        final isToday = _selectedYear == now.year &&
+                        final isToday =
+                            _selectedYear == now.year &&
                             _selectedMonth == now.month &&
                             day == now.day;
-                        final isFutureDay = _selectedYear > now.year ||
-                            (_selectedYear == now.year && _selectedMonth > now.month) ||
+                        final isFutureDay =
+                            _selectedYear > now.year ||
+                            (_selectedYear == now.year &&
+                                _selectedMonth > now.month) ||
                             (_selectedYear == now.year &&
                                 _selectedMonth == now.month &&
                                 day > now.day);
 
                         final dateKey =
                             '$_selectedYear-${_selectedMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-                        final movies = isFutureDay ? <Map<String, dynamic>>[] : (_calendarData[dateKey] ?? []);
+                        final movies = isFutureDay
+                            ? <Map<String, dynamic>>[]
+                            : (_calendarData[dateKey] ?? []);
 
                         return InkWell(
                           onTap: isFutureDay
@@ -432,10 +448,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                       color: isFutureDay
                                           ? Colors.white24
                                           : (isToday
-                                              ? Colors.white
-                                              : (day > 30 ? Colors.grey[700] : Colors.white70)),
+                                                ? Colors.white
+                                                : (day > 30
+                                                      ? Colors.grey[700]
+                                                      : Colors.white70)),
                                       fontSize: 15,
-                                      fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
+                                      fontWeight: isToday
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
                                     ),
                                   ),
                                 ),
@@ -448,25 +468,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     runSpacing: 2,
                                     alignment: WrapAlignment.center,
                                     children: movies.map((m) {
-                                      final posterPath = m['posterPath'] as String?;
+                                      final posterPath =
+                                          m['posterPath'] as String?;
                                       return ClipRRect(
                                         borderRadius: BorderRadius.circular(3),
-                                        child: (posterPath != null && posterPath.isNotEmpty)
+                                        child:
+                                            (posterPath != null &&
+                                                posterPath.isNotEmpty)
                                             ? Image.network(
                                                 'https://image.tmdb.org/t/p/w200$posterPath',
                                                 width: 16,
                                                 height: 22,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (c, e, s) => Container(
-                                                  width: 16,
-                                                  height: 22,
-                                                  color: const Color(0xFF8B5CF6),
-                                                  child: const Icon(
-                                                    Icons.movie,
-                                                    color: Colors.white,
-                                                    size: 10,
-                                                  ),
-                                                ),
+                                                errorBuilder: (c, e, s) =>
+                                                    Container(
+                                                      width: 16,
+                                                      height: 22,
+                                                      color: const Color(
+                                                        0xFF8B5CF6,
+                                                      ),
+                                                      child: const Icon(
+                                                        Icons.movie,
+                                                        color: Colors.white,
+                                                        size: 10,
+                                                      ),
+                                                    ),
                                               )
                                             : Container(
                                                 width: 16,
@@ -496,7 +522,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
           // 3. Bottom Button: + 본 작품 추가하기
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 16.0,
+            ),
             child: SizedBox(
               width: double.infinity,
               height: 50,

@@ -88,6 +88,7 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
+          tooltip: '뒤로 가기',
           onPressed: () => Navigator.pop(context, true),
         ),
         title: TextField(
@@ -112,6 +113,7 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
               _searchController.text.isNotEmpty ? Icons.close : Icons.search,
               color: Colors.white70,
             ),
+            tooltip: _searchController.text.isNotEmpty ? '검색어 지우기' : '영화 검색',
             onPressed: () {
               if (_searchController.text.isNotEmpty) {
                 _searchController.clear();
@@ -127,7 +129,10 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
             child: Text(
               _isSearching ? '검색 결과' : '인기 작품',
               style: const TextStyle(
@@ -143,79 +148,81 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
                     child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
                   )
                 : _movies.isEmpty
-                    ? Center(
-                        child: Text(
-                          _isSearching
-                              ? '검색된 작품이 없습니다.'
-                              : '인기 작품을 불러올 수 없습니다.',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 15),
-                        ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                ? Center(
+                    child: Text(
+                      _isSearching ? '검색된 작품이 없습니다.' : '인기 작품을 불러올 수 없습니다.',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 15),
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 3,
                           childAspectRatio: 0.62,
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 16,
                         ),
-                        itemCount: _movies.length,
-                        itemBuilder: (context, index) {
-                          final movie = _movies[index];
-                          return GestureDetector(
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => MovieDetailScreen(movie: movie),
-                                ),
-                              );
-                            },
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8.0),
-                                    child: movie.fullPosterUrl.isNotEmpty
-                                        ? Image.network(
-                                            movie.fullPosterUrl,
-                                            width: double.infinity,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (ctx, err, stack) =>
-                                                Container(
+                    itemCount: _movies.length,
+                    itemBuilder: (context, index) {
+                      final movie = _movies[index];
+                      return GestureDetector(
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MovieDetailScreen(movie: movie),
+                            ),
+                          );
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8.0),
+                                child: movie.fullPosterUrl.isNotEmpty
+                                    ? Image.network(
+                                        movie.fullPosterUrl,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (ctx, err, stack) =>
+                                            Container(
                                               color: Colors.grey[850],
                                               child: const Icon(
                                                 Icons.movie,
                                                 color: Colors.white54,
                                               ),
                                             ),
-                                          )
-                                        : Container(
-                                            color: Colors.grey[850],
-                                            child: const Icon(
-                                              Icons.movie,
-                                              color: Colors.white54,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  movie.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                      )
+                                    : Container(
+                                        color: Colors.grey[850],
+                                        child: const Icon(
+                                          Icons.movie,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                            const SizedBox(height: 6),
+                            Text(
+                              movie.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

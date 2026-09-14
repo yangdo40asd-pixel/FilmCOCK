@@ -31,7 +31,12 @@ class LanguageFilter {
   }
 
   // 영화 리스트를 받아 필터링된 깨끗한 한/영 리스트만 반환
-  static List<Movie> filterMovies(List<Movie> movies, {bool isUpcoming = false}) {
-    return movies.where((movie) => isValidMovie(movie, isUpcoming: isUpcoming)).toList();
+  static List<Movie> filterMovies(
+    List<Movie> movies, {
+    bool isUpcoming = false,
+  }) {
+    return movies
+        .where((movie) => isValidMovie(movie, isUpcoming: isUpcoming))
+        .toList();
   }
 }

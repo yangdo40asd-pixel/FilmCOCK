@@ -2,6 +2,7 @@
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:flutter/material.dart';
+import 'package:filmcock_app/presentation/widgets/app_network_image.dart';
 
 class MoviePoster extends StatelessWidget {
   final Movie movie;
@@ -26,19 +27,7 @@ class MoviePoster extends StatelessWidget {
           width: 130,
           height: 190,
           color: Colors.grey[800],
-          child: Image.network(
-            movie.fullPosterUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const Center(child: CircularProgressIndicator());
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return const Center(
-                child: Icon(Icons.error_outline, color: Colors.white),
-              );
-            },
-          ),
+          child: AppNetworkImage(imageUrl: movie.fullPosterUrl),
         ),
       ),
     );

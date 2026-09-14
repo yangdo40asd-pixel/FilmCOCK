@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:filmcock_app/data/models/mbti_info.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/mbti_panel_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================================
 // MBTI 선택 시작 화면 (안내 팝업 + 선택하기 / 건너뛰기)
 // ============================================================
 class MbtiSelectScreen extends StatefulWidget {
-  const MbtiSelectScreen({super.key});
+  final bool isResetMode;
+
+  const MbtiSelectScreen({super.key, this.isResetMode = false});
 
   @override
   State<MbtiSelectScreen> createState() => _MbtiSelectScreenState();
@@ -54,14 +55,12 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                 children: [
                   ElevatedButton(
                     onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.remove('user_mbti');
                       if (!mounted || !dialogContext.mounted) return;
                       Navigator.of(dialogContext).pop();
-                      Navigator.of(context).push(
+                      final changed = await Navigator.of(context).push<bool>(
                         MaterialPageRoute(
-                          builder: (_) => const GenreSelectScreen(
-                            mbtiInfo: MbtiInfo(
+                          builder: (_) => GenreSelectScreen(
+                            mbtiInfo: const MbtiInfo(
                               id: 'NONE',
                               title: '건너뛰기',
                               description: '',
@@ -71,9 +70,13 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                               famousPeople: [],
                               svgAsset: '',
                             ),
+                            isResetMode: widget.isResetMode,
                           ),
                         ),
                       );
+                      if (changed == true && mounted && widget.isResetMode) {
+                        Navigator.of(context).pop(true);
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF8B5CF6),
@@ -124,10 +127,7 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                 children: [
                   const Spacer(flex: 2),
                   // 상단 MBTI 캐릭터 일러스트
-                  Image.asset(
-                    'assets/images/mbti.png',
-                    fit: BoxFit.contain,
-                  ),
+                  Image.asset('assets/images/mbti.png', fit: BoxFit.contain),
                   const SizedBox(height: 48),
                   // 메인 타이틀
                   const Text(
@@ -158,17 +158,26 @@ class _MbtiSelectScreenState extends State<MbtiSelectScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
+                      onPressed: () async {
+                        final changed = await Navigator.of(context).push<bool>(
                           MaterialPageRoute(
-                            builder: (_) => const MbtiPanelScreen(),
+                            builder: (_) => MbtiPanelScreen(
+                              isResetMode: widget.isResetMode,
+                            ),
                           ),
                         );
+                        if (changed == true &&
+                            context.mounted &&
+                            widget.isResetMode) {
+                          Navigator.of(context).pop(true);
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6356E5),
                         elevation: 4,
-                        shadowColor: const Color(0xFF6356E5).withValues(alpha: 0.35),
+                        shadowColor: const Color(
+                          0xFF6356E5,
+                        ).withValues(alpha: 0.35),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),

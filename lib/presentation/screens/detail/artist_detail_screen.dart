@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/widgets/movie_poster.dart';
+import 'package:filmcock_app/presentation/widgets/app_network_image.dart';
+import 'package:filmcock_app/data/repositories/activity_repository.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final int artistId;
@@ -22,6 +22,7 @@ class ArtistDetailScreen extends StatefulWidget {
 }
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
+  final ActivityRepository _activityRepository = const ActivityRepository();
   late Future<List<Movie>> filmography;
   bool _isLiked = false;
 
@@ -36,52 +37,59 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   }
 
   Future<void> _loadLikeState() async {
-    final prefs = await SharedPreferences.getInstance();
+    final liked = await _activityRepository.isPersonLiked(widget.artistId);
+    if (!mounted) return;
     setState(() {
-      _isLiked = prefs.getBool('liked_person_${widget.artistId}') ?? false;
+      _isLiked = liked;
     });
   }
 
   Future<void> _toggleLike() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nextState = !_isLiked;
+    final previousState = _isLiked;
+    final nextState = !previousState;
     setState(() {
       _isLiked = nextState;
     });
-    await prefs.setBool('liked_person_${widget.artistId}', nextState);
-
-    final rawList = prefs.getStringList('liked_people') ?? [];
-    List<Map<String, dynamic>> people = rawList.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((m) => m.isNotEmpty).toList();
-
-    people.removeWhere((p) => p['id'].toString() == widget.artistId.toString());
-    if (nextState) {
-      people.insert(0, {
-        'id': widget.artistId,
-        'name': widget.artistName,
-        'profileUrl': widget.profileUrl ?? '',
-        'department': '감독',
-      });
-    }
-    await prefs.setStringList(
-      'liked_people',
-      people.map((e) => jsonEncode(e)).toList(),
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nextState ? '💖 좋아요한 인물에 추가되었습니다.' : '좋아요가 취소되었습니다.',
-          ),
-          duration: const Duration(seconds: 1),
-        ),
+    List<Map<String, dynamic>>? previousPeople;
+    try {
+      await _activityRepository.setPersonLiked(widget.artistId, nextState);
+      final people = await _activityRepository.likedPeople();
+      previousPeople = List<Map<String, dynamic>>.from(people);
+      people.removeWhere(
+        (person) => person['id'].toString() == widget.artistId.toString(),
       );
+      if (nextState) {
+        people.insert(0, {
+          'id': widget.artistId,
+          'name': widget.artistName,
+          'profileUrl': widget.profileUrl ?? '',
+          'department': '감독',
+        });
+      }
+      await _activityRepository.saveLikedPeople(people);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(nextState ? '💖 좋아요한 인물에 추가되었습니다.' : '좋아요가 취소되었습니다.'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (_) {
+      try {
+        await _activityRepository.setPersonLiked(
+          widget.artistId,
+          previousState,
+        );
+        if (previousPeople != null) {
+          await _activityRepository.saveLikedPeople(previousPeople);
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _isLiked = previousState);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('저장하지 못했습니다. 다시 시도해주세요.')));
     }
   }
 
@@ -99,6 +107,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               _isLiked ? Icons.favorite : Icons.favorite_border,
               color: _isLiked ? const Color(0xFFFF4D4F) : Colors.white,
             ),
+            tooltip: _isLiked ? '좋아요 취소' : '좋아요',
             onPressed: _toggleLike,
           ),
         ],
@@ -109,15 +118,16 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.grey[800],
-                backgroundImage: widget.profileUrl?.isNotEmpty == true
-                    ? NetworkImage(widget.profileUrl!)
-                    : null,
-                child: widget.profileUrl?.isNotEmpty == true
-                    ? null
-                    : const Icon(Icons.person, color: Colors.white70, size: 48),
+              ClipOval(
+                child: SizedBox(
+                  width: 120,
+                  height: 120,
+                  child: AppNetworkImage(
+                    imageUrl: widget.profileUrl ?? '',
+                    placeholderIcon: Icons.person,
+                    placeholderIconSize: 48,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               Text(

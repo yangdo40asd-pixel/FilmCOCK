@@ -1,13 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/data/models/search_suggestion.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
+import 'package:filmcock_app/presentation/controllers/search_screen_controller.dart';
 import 'package:filmcock_app/presentation/screens/detail/actor_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/artist_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/screens/search/search_results_screen.dart';
+import 'package:filmcock_app/presentation/widgets/app_loading_indicator.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -17,129 +17,90 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  final SearchScreenController _state = SearchScreenController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-
-  Timer? _debounce;
-  List<SearchSuggestion> _suggestions = [];
-  bool _isLoadingSuggestions = false;
-
-  List<String> _recentSearches = [];
   Future<List<Movie>>? _popularMoviesFuture;
 
+  List<SearchSuggestion> get _suggestions => _state.suggestions;
+  bool get _isLoadingSuggestions => _state.isLoadingSuggestions;
+  String? get _suggestionError => _state.suggestionError;
+  List<String> get _recentSearches => _state.recentSearches;
+
   static const List<String> _genreKeywords = [
-    '액션', '스릴러', '어드벤처', '코미디',
-    '판타지', '공포', '로맨스', '애니메이션',
-    '범죄', '다큐멘터리', '드라마', '가족',
-    '미스터리', 'SF', '좀비', '히어로',
+    '액션',
+    '스릴러',
+    '어드벤처',
+    '코미디',
+    '판타지',
+    '공포',
+    '로맨스',
+    '애니메이션',
+    '범죄',
+    '다큐멘터리',
+    '드라마',
+    '가족',
+    '미스터리',
+    'SF',
+    '좀비',
+    '히어로',
   ];
+
+  static const Map<String, int> _genreIds = {
+    '액션': 28,
+    '스릴러': 53,
+    '어드벤처': 12,
+    '코미디': 35,
+    '판타지': 14,
+    '공포': 27,
+    '로맨스': 10749,
+    '애니메이션': 16,
+    '범죄': 80,
+    '다큐멘터리': 99,
+    '드라마': 18,
+    '가족': 10751,
+    '미스터리': 9648,
+    'SF': 878,
+  };
 
   @override
   void initState() {
     super.initState();
-    _loadRecentSearches();
+    _state.addListener(_onStateChanged);
+    _state.loadRecentSearches();
     _popularMoviesFuture = ApiService.getPopularMovies();
     _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
+    _state.removeListener(_onStateChanged);
+    _state.dispose();
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  // --- 최근 검색어 관리 ---
-  Future<void> _loadRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getStringList('recent_searches') ?? ['장동건', '봉준호'];
-    if (mounted) {
-      setState(() {
-        _recentSearches = saved;
-      });
-    }
+  void _onStateChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _addRecentSearch(String query) async {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final updated = List<String>.from(_recentSearches);
-    updated.remove(trimmed);
-    updated.insert(0, trimmed);
-    if (updated.length > 10) {
-      updated.removeRange(10, updated.length);
-    }
-
-    await prefs.setStringList('recent_searches', updated);
-    if (mounted) {
-      setState(() {
-        _recentSearches = updated;
-      });
-    }
+    await _state.addRecentSearch(query);
   }
 
   Future<void> _removeRecentSearch(String query) async {
-    final prefs = await SharedPreferences.getInstance();
-    final updated = List<String>.from(_recentSearches)..remove(query);
-    await prefs.setStringList('recent_searches', updated);
-    if (mounted) {
-      setState(() {
-        _recentSearches = updated;
-      });
-    }
+    await _state.removeRecentSearch(query);
   }
 
   Future<void> _clearRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('recent_searches');
-    if (mounted) {
-      setState(() {
-        _recentSearches = [];
-      });
-    }
+    await _state.clearRecentSearches();
   }
 
   // --- 실시간 추천 검색어 검색 (Debounce 250ms) ---
   void _onSearchChanged() {
-    final query = _searchController.text.trim();
-    _debounce?.cancel();
-
-    if (query.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _suggestions = [];
-          _isLoadingSuggestions = false;
-        });
-      }
-      return;
-    }
-
-    _debounce = Timer(const Duration(milliseconds: 250), () async {
-      if (!mounted) return;
-      setState(() {
-        _isLoadingSuggestions = true;
-      });
-
-      try {
-        final results = await ApiService.getSearchSuggestions(query);
-        if (mounted) {
-          setState(() {
-            _suggestions = results;
-            _isLoadingSuggestions = false;
-          });
-        }
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _isLoadingSuggestions = false;
-          });
-        }
-      }
-    });
+    _state.updateQuery(_searchController.text);
   }
 
   // 검색 실행 및 결과 화면 이동
@@ -159,7 +120,8 @@ class _SearchScreenState extends State<SearchScreen> {
     _addRecentSearch(item.title);
 
     if (item.isMovie) {
-      final movie = item.movie ??
+      final movie =
+          item.movie ??
           Movie(
             id: item.id,
             title: item.title,
@@ -169,12 +131,11 @@ class _SearchScreenState extends State<SearchScreen> {
             voteAverage: 0.0,
           );
       Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MovieDetailScreen(movie: movie),
-        ),
+        MaterialPageRoute(builder: (_) => MovieDetailScreen(movie: movie)),
       );
     } else {
-      final person = item.person ??
+      final person =
+          item.person ??
           Person(
             id: item.id,
             name: item.title,
@@ -194,9 +155,7 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       } else {
         Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ActorDetailScreen(actor: person),
-          ),
+          MaterialPageRoute(builder: (_) => ActorDetailScreen(actor: person)),
         );
       }
     }
@@ -207,7 +166,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final isQuerying = _searchController.text.trim().isNotEmpty;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF16161A),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -230,27 +189,31 @@ class _SearchScreenState extends State<SearchScreen> {
   // 상단 검색창 위젯
   // ============================================================
   Widget _buildSearchBar() {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       child: Container(
         height: 50.0,
         decoration: BoxDecoration(
-          color: const Color(0xFF282830),
+          color: colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(25.0),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            const Icon(Icons.search, color: Color(0xFF9E9E9E), size: 24),
+            Icon(Icons.search, color: colors.onSurfaceVariant, size: 24),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: _searchController,
                 focusNode: _focusNode,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-                decoration: const InputDecoration(
-                  hintText: '제목, 배우 검색...',
-                  hintStyle: TextStyle(color: Color(0xFF8E8E93), fontSize: 15),
+                style: TextStyle(color: colors.onSurface, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: '영화, 배우, 감독 검색...',
+                  hintStyle: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 15,
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: EdgeInsets.zero,
@@ -260,20 +223,18 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
             if (_searchController.text.isNotEmpty)
-              GestureDetector(
-                onTap: () {
+              IconButton(
+                tooltip: '검색어 지우기',
+                onPressed: () {
                   _searchController.clear();
-                  setState(() {
-                    _suggestions = [];
-                  });
+                  _state.updateQuery('');
                 },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6.0),
-                  child: Icon(Icons.close, color: Color(0xFF9E9E9E), size: 20),
+                icon: Icon(
+                  Icons.close,
+                  color: colors.onSurfaceVariant,
+                  size: 20,
                 ),
               ),
-            const SizedBox(width: 4),
-            const Icon(Icons.mic_none_outlined, color: Color(0xFF9E9E9E), size: 24),
           ],
         ),
       ),
@@ -284,15 +245,16 @@ class _SearchScreenState extends State<SearchScreen> {
   // [State 1] 추천 검색어 목록 뷰 (참고 이미지 1)
   // ============================================================
   Widget _buildSuggestionView() {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 12.0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 12.0),
           child: Text(
             '추천 검색어',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.onSurface,
               fontSize: 20.0,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -302,24 +264,47 @@ class _SearchScreenState extends State<SearchScreen> {
         if (_isLoadingSuggestions)
           const Expanded(
             child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+              child: AppLoadingIndicator(label: '추천 검색어를 불러오는 중입니다.'),
+            ),
+          )
+        else if (_suggestionError != null)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _suggestionError!,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _onSearchChanged,
+                    child: const Text('다시 시도'),
+                  ),
+                ],
               ),
             ),
           )
         else if (_suggestions.isEmpty)
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 '일치하는 추천 검색어가 없습니다.',
-                style: TextStyle(color: Colors.white54, fontSize: 15),
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 15),
               ),
             ),
           )
         else
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 4.0,
+              ),
               itemCount: _suggestions.length,
               separatorBuilder: (_, __) => const SizedBox(height: 6.0),
               itemBuilder: (context, index) {
@@ -328,7 +313,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   onTap: () => _onSuggestionTap(item),
                   borderRadius: BorderRadius.circular(10.0),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6.0,
+                      vertical: 8.0,
+                    ),
                     child: Row(
                       children: [
                         // 포스터 / 인물 썸네일
@@ -337,12 +325,15 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Container(
                             width: 52,
                             height: 68,
-                            color: const Color(0xFF282832),
-                            child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                            color: colors.surfaceContainerHighest,
+                            child:
+                                item.imageUrl != null &&
+                                    item.imageUrl!.isNotEmpty
                                 ? Image.network(
                                     item.imageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => _buildFallbackIcon(item.isMovie),
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildFallbackIcon(item.isMovie),
                                   )
                                 : _buildFallbackIcon(item.isMovie),
                           ),
@@ -355,8 +346,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             children: [
                               Text(
                                 item.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: colors.onSurface,
                                   fontSize: 16.0,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -366,8 +357,8 @@ class _SearchScreenState extends State<SearchScreen> {
                               const SizedBox(height: 4.0),
                               Text(
                                 item.typeLabel,
-                                style: const TextStyle(
-                                  color: Color(0xFF8E8E93),
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
                                   fontSize: 13.0,
                                 ),
                               ),
@@ -389,7 +380,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Center(
       child: Icon(
         isMovie ? Icons.movie_outlined : Icons.person_outline,
-        color: Colors.white38,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
         size: 28,
       ),
     );
@@ -425,6 +416,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return const SizedBox.shrink();
     }
 
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,10 +425,10 @@ class _SearchScreenState extends State<SearchScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '최근 검색어',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: colors.onSurface,
                   fontSize: 18.0,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
@@ -444,10 +436,10 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               GestureDetector(
                 onTap: _clearRecentSearches,
-                child: const Text(
+                child: Text(
                   '전체 삭제',
                   style: TextStyle(
-                    color: Color(0xFF8E8E93),
+                    color: colors.onSurfaceVariant,
                     fontSize: 14.0,
                   ),
                 ),
@@ -463,10 +455,13 @@ class _SearchScreenState extends State<SearchScreen> {
             children: _recentSearches.map((query) {
               return Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF282832),
+                  color: colors.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20.0),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14.0,
+                  vertical: 8.0,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -477,8 +472,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       },
                       child: Text(
                         query,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: colors.onSurface,
                           fontSize: 14.0,
                         ),
                       ),
@@ -486,10 +481,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     const SizedBox(width: 8.0),
                     GestureDetector(
                       onTap: () => _removeRecentSearch(query),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close,
                         size: 16.0,
-                        color: Color(0xFF8E8E93),
+                        color: colors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -504,15 +499,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // --- 장르 & 키워드 ---
   Widget _buildGenreKeywordsSection() {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18.0, 0, 18.0, 14.0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18.0, 0, 18.0, 14.0),
           child: Text(
             '장르 & 키워드',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.onSurface,
               fontSize: 18.0,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -535,20 +531,27 @@ class _SearchScreenState extends State<SearchScreen> {
               final keyword = _genreKeywords[index];
               return InkWell(
                 onTap: () {
-                  _searchController.text = keyword;
-                  _submitSearch(keyword);
+                  _addRecentSearch(keyword);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SearchResultsScreen(
+                        searchQuery: keyword,
+                        genreId: _genreIds[keyword],
+                      ),
+                    ),
+                  );
                 },
                 borderRadius: BorderRadius.circular(10.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF282832),
+                    color: colors.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                   child: Center(
                     child: Text(
                       keyword,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: colors.onSurface,
                         fontSize: 14.0,
                         fontWeight: FontWeight.w500,
                       ),
@@ -565,15 +568,16 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // --- 인기 영화 ---
   Widget _buildPopularMoviesSection() {
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(18.0, 0, 18.0, 14.0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18.0, 0, 18.0, 14.0),
           child: Text(
             '인기 영화',
             style: TextStyle(
-              color: Colors.white,
+              color: colors.onSurface,
               fontSize: 18.0,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
@@ -587,16 +591,29 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                  child: AppLoadingIndicator(label: '인기 검색어를 불러오는 중입니다.'),
+                );
+              }
+              if (snapshot.hasError) {
+                return Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _popularMoviesFuture = ApiService.getPopularMovies();
+                      });
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('인기 영화를 다시 불러오기'),
                   ),
                 );
               }
               final movies = snapshot.data ?? [];
               if (movies.isEmpty) {
-                return const Center(
-                  child: Text('인기 영화 데이터를 불러올 수 없습니다.',
-                      style: TextStyle(color: Colors.white54)),
+                return Center(
+                  child: Text(
+                    '인기 영화 데이터를 불러올 수 없습니다.',
+                    style: TextStyle(color: colors.onSurfaceVariant),
+                  ),
                 );
               }
 
@@ -624,18 +641,24 @@ class _SearchScreenState extends State<SearchScreen> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10.0),
                               child: Container(
-                                color: const Color(0xFF282832),
+                                color: colors.surfaceContainerHighest,
                                 width: double.infinity,
                                 child: movie.fullPosterUrl.isNotEmpty
                                     ? Image.network(
                                         movie.fullPosterUrl,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Center(
-                                          child: Icon(Icons.movie, color: Colors.white38),
+                                        errorBuilder: (_, __, ___) => Center(
+                                          child: Icon(
+                                            Icons.movie,
+                                            color: colors.onSurfaceVariant,
+                                          ),
                                         ),
                                       )
-                                    : const Center(
-                                        child: Icon(Icons.movie, color: Colors.white38),
+                                    : Center(
+                                        child: Icon(
+                                          Icons.movie,
+                                          color: colors.onSurfaceVariant,
+                                        ),
                                       ),
                               ),
                             ),
@@ -643,8 +666,8 @@ class _SearchScreenState extends State<SearchScreen> {
                           const SizedBox(height: 8.0),
                           Text(
                             movie.title,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: colors.onSurface,
                               fontSize: 13.0,
                               fontWeight: FontWeight.w500,
                             ),

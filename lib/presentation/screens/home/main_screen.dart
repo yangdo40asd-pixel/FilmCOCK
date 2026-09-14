@@ -12,20 +12,25 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0; // 현재 선택된 탭의 인덱스
+  int _selectedIndex = 0;
 
-  // 각 탭에 해당하는 화면 목록
-  static final List<Widget> _widgetOptions = <Widget>[
-    const HomeScreen(),
-    const SearchScreen(),
-    const PreferenceScreen(),
-    const MyPageScreen(),
-  ];
+  final List<Widget?> _pages = <Widget?>[const HomeScreen(), null, null, null];
 
-  // 탭을 눌렀을 때 호출될 함수
+  Widget _createPage(int index) {
+    return switch (index) {
+      0 => const HomeScreen(),
+      1 => const SearchScreen(),
+      2 => const PreferenceScreen(),
+      3 => const MyPageScreen(),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
   void _onItemTapped(int index) {
+    if (_selectedIndex == index) return;
     setState(() {
-      _selectedIndex = index; // 선택된 탭의 인덱스를 변경
+      _pages[index] ??= _createPage(index);
+      _selectedIndex = index;
     });
   }
 
@@ -33,27 +38,39 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: Center(
-        child: _widgetOptions.elementAt(_selectedIndex), // 선택된 탭에 맞는 화면을 보여줌
-      ),
-      bottomNavigationBar: Theme(
-        data: Theme.of(context).copyWith(
-          canvasColor: isDark ? const Color(0xFF1F1F1F) : Colors.white,
+    return PopScope(
+      canPop: _selectedIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selectedIndex != 0) {
+          _onItemTapped(0);
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: List.generate(
+            _pages.length,
+            (index) => _pages[index] ?? const SizedBox.shrink(),
+          ),
         ),
-        child: BottomNavigationBar(
-          items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
-            BottomNavigationBarItem(icon: Icon(Icons.search), label: '검색'),
-            BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '취향'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: '마이페이지'),
-          ],
-          currentIndex: _selectedIndex,
-          selectedItemColor: const Color(0xFF6A5ACD),
-          unselectedItemColor: isDark ? Colors.grey[500] : Colors.grey[600],
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
+        bottomNavigationBar: Theme(
+          data: Theme.of(context).copyWith(
+            canvasColor: isDark ? const Color(0xFF1F1F1F) : Colors.white,
+          ),
+          child: BottomNavigationBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
+              BottomNavigationBarItem(icon: Icon(Icons.search), label: '검색'),
+              BottomNavigationBarItem(icon: Icon(Icons.favorite), label: '취향'),
+              BottomNavigationBarItem(icon: Icon(Icons.person), label: '마이페이지'),
+            ],
+            currentIndex: _selectedIndex,
+            selectedItemColor: const Color(0xFF6A5ACD),
+            unselectedItemColor: isDark ? Colors.grey[500] : Colors.grey[600],
+            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+            onTap: _onItemTapped,
+            type: BottomNavigationBarType.fixed,
+          ),
         ),
       ),
     );

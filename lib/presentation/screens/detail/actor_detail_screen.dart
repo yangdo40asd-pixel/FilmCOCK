@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
+import 'package:filmcock_app/presentation/widgets/app_network_image.dart';
+import 'package:filmcock_app/data/repositories/activity_repository.dart';
 
 class ActorDetailScreen extends StatefulWidget {
   final Person actor;
@@ -15,6 +15,7 @@ class ActorDetailScreen extends StatefulWidget {
 }
 
 class _ActorDetailScreenState extends State<ActorDetailScreen> {
+  final ActivityRepository _activityRepository = const ActivityRepository();
   late Future<List<Movie>> filmography;
   bool _isLiked = false;
   Set<int> _likedMovieIds = {};
@@ -28,25 +29,20 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
   }
 
   Future<void> _loadLikeState() async {
-    final prefs = await SharedPreferences.getInstance();
+    final liked = await _activityRepository.isPersonLiked(widget.actor.id);
     if (mounted) {
       setState(() {
-        _isLiked = prefs.getBool('liked_person_${widget.actor.id}') ?? false;
+        _isLiked = liked;
       });
     }
   }
 
   Future<void> _loadLikedMovies() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawList = prefs.getStringList('liked_movies_data') ?? [];
-    final Set<int> ids = {};
-    for (final item in rawList) {
-      try {
-        final map = jsonDecode(item) as Map<String, dynamic>;
-        final id = int.tryParse(map['id'].toString());
-        if (id != null) ids.add(id);
-      } catch (_) {}
-    }
+    final movies = await _activityRepository.likedMovies();
+    final ids = movies
+        .map((movie) => int.tryParse(movie['id'].toString()))
+        .whereType<int>()
+        .toSet();
     if (mounted) {
       setState(() {
         _likedMovieIds = ids;
@@ -55,50 +51,55 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
   }
 
   Future<void> _toggleActorLike() async {
-    final prefs = await SharedPreferences.getInstance();
-    final nextState = !_isLiked;
+    final previousState = _isLiked;
+    final nextState = !previousState;
     setState(() {
       _isLiked = nextState;
     });
-    await prefs.setBool('liked_person_${widget.actor.id}', nextState);
-
-    final rawList = prefs.getStringList('liked_people') ?? [];
-    List<Map<String, dynamic>> people = rawList.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((m) => m.isNotEmpty).toList();
-
-    people.removeWhere((p) => p['id'].toString() == widget.actor.id.toString());
-    if (nextState) {
-      people.insert(0, {
-        'id': widget.actor.id,
-        'name': widget.actor.displayName,
-        'profileUrl': widget.actor.fullProfileUrl,
-        'department': '배우',
-      });
-    }
-    await prefs.setStringList(
-      'liked_people',
-      people.map((e) => jsonEncode(e)).toList(),
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nextState ? '💖 좋아요한 인물에 추가되었습니다.' : '좋아요가 취소되었습니다.',
-          ),
-          duration: const Duration(seconds: 1),
-        ),
+    List<Map<String, dynamic>>? previousPeople;
+    try {
+      await _activityRepository.setPersonLiked(widget.actor.id, nextState);
+      final people = await _activityRepository.likedPeople();
+      previousPeople = List<Map<String, dynamic>>.from(people);
+      people.removeWhere(
+        (person) => person['id'].toString() == widget.actor.id.toString(),
       );
+      if (nextState) {
+        people.insert(0, {
+          'id': widget.actor.id,
+          'name': widget.actor.displayName,
+          'profileUrl': widget.actor.fullProfileUrl,
+          'department': '배우',
+        });
+      }
+      await _activityRepository.saveLikedPeople(people);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(nextState ? '💖 좋아요한 인물에 추가되었습니다.' : '좋아요가 취소되었습니다.'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (_) {
+      try {
+        await _activityRepository.setPersonLiked(
+          widget.actor.id,
+          previousState,
+        );
+        if (previousPeople != null) {
+          await _activityRepository.saveLikedPeople(previousPeople);
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _isLiked = previousState);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('저장하지 못했습니다. 다시 시도해주세요.')));
     }
   }
 
   Future<void> _toggleMovieLike(Movie movie) async {
-    final prefs = await SharedPreferences.getInstance();
     final isCurrentlyLiked = _likedMovieIds.contains(movie.id);
     final nextState = !isCurrentlyLiked;
 
@@ -110,43 +111,51 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
       }
     });
 
-    await prefs.setBool('liked_movie_${movie.id}', nextState);
-
-    final rawList = prefs.getStringList('liked_movies_data') ?? [];
-    List<Map<String, dynamic>> movies = rawList.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((m) => m.isNotEmpty).toList();
-
-    movies.removeWhere((m) => m['id'].toString() == movie.id.toString());
-    if (nextState) {
-      movies.insert(0, {
-        'id': movie.id,
-        'title': movie.title,
-        'posterPath': movie.posterPath,
-        'voteAverage': movie.voteAverage,
-      });
-    }
-
-    await prefs.setStringList(
-      'liked_movies_data',
-      movies.map((e) => jsonEncode(e)).toList(),
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            nextState
-                ? '🍿 내가 추천한 띵작에 추가되었습니다.'
-                : '추천한 띵작에서 삭제되었습니다.',
-          ),
-          duration: const Duration(seconds: 1),
-        ),
+    List<Map<String, dynamic>>? previousMovies;
+    try {
+      await _activityRepository.setMovieLiked(movie.id, nextState);
+      final movies = await _activityRepository.likedMovies();
+      previousMovies = List<Map<String, dynamic>>.from(movies);
+      movies.removeWhere(
+        (item) => item['id'].toString() == movie.id.toString(),
       );
+      if (nextState) {
+        movies.insert(0, {
+          'id': movie.id,
+          'title': movie.title,
+          'posterPath': movie.posterPath,
+          'voteAverage': movie.voteAverage,
+        });
+      }
+      await _activityRepository.saveLikedMovies(movies);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              nextState ? '🍿 내가 추천한 띵작에 추가되었습니다.' : '추천한 띵작에서 삭제되었습니다.',
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (_) {
+      try {
+        await _activityRepository.setMovieLiked(movie.id, isCurrentlyLiked);
+        if (previousMovies != null) {
+          await _activityRepository.saveLikedMovies(previousMovies);
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        if (isCurrentlyLiked) {
+          _likedMovieIds.add(movie.id);
+        } else {
+          _likedMovieIds.remove(movie.id);
+        }
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('저장하지 못했습니다. 다시 시도해주세요.')));
     }
   }
 
@@ -164,11 +173,10 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
                 SizedBox(
                   height: 440,
                   width: double.infinity,
-                  child: Image.network(
-                    widget.actor.fullProfileUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        Container(color: Colors.grey[850]),
+                  child: AppNetworkImage(
+                    imageUrl: widget.actor.fullProfileUrl,
+                    placeholderIcon: Icons.person,
+                    placeholderIconSize: 64,
                   ),
                 ),
                 Positioned(
@@ -200,6 +208,7 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
                       color: Colors.white,
                       size: 30,
                     ),
+                    tooltip: '뒤로 가기',
                     onPressed: () => Navigator.pop(context),
                   ),
                 ),
@@ -232,11 +241,12 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
                       boxShadow: _isLiked
                           ? [
                               BoxShadow(
-                                color: const Color(0xFF6B4EE6)
-                                    .withValues(alpha: 0.4),
+                                color: const Color(
+                                  0xFF6B4EE6,
+                                ).withValues(alpha: 0.4),
                                 blurRadius: 10,
                                 offset: const Offset(0, 3),
-                              )
+                              ),
                             ]
                           : null,
                     ),
@@ -353,26 +363,9 @@ class _ActorDetailScreenState extends State<ActorDetailScreen> {
                             child: SizedBox(
                               width: double.infinity,
                               height: double.infinity,
-                              child: movie.fullPosterUrl.isNotEmpty
-                                  ? Image.network(
-                                      movie.fullPosterUrl,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (ctx, err, stack) =>
-                                          Container(
-                                        color: Colors.grey[850],
-                                        child: const Icon(
-                                          Icons.movie,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      color: Colors.grey[850],
-                                      child: const Icon(
-                                        Icons.movie,
-                                        color: Colors.white54,
-                                      ),
-                                    ),
+                              child: AppNetworkImage(
+                                imageUrl: movie.fullPosterUrl,
+                              ),
                             ),
                           ),
 

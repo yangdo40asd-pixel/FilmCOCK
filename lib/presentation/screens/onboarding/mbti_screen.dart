@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-// 1. shared_preferences 패키지를 import
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:filmcock_app/data/services/preference_change_service.dart';
+import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 import 'package:filmcock_app/data/models/mbti_info.dart';
 import 'package:filmcock_app/presentation/screens/onboarding/genre_select_screen.dart';
 
@@ -12,13 +12,15 @@ class MbtiScreen extends StatefulWidget {
 }
 
 class _MbtiScreenState extends State<MbtiScreen> {
+  final UserSettingsRepository _settingsRepository =
+      const UserSettingsRepository();
   String? _selectedMbti;
 
   // 2. 화면 이동 함수를 async로 변경하고, 저장할 값을 받도록 수정
-  void _navigateToGenre(BuildContext context, {String? mbtiToSave}) async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _navigateToGenre({String? mbtiToSave}) async {
     if (mbtiToSave != null) {
-      await prefs.setString('user_mbti', mbtiToSave);
+      await _settingsRepository.saveMbti(mbtiToSave);
+      PreferenceChangeService.notifyChanged();
     }
 
     if (mounted) {
@@ -136,7 +138,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
               ElevatedButton(
                 onPressed: () {
                   // 7. 선택한 MBTI 값을 저장하도록 전달
-                  _navigateToGenre(context, mbtiToSave: _selectedMbti);
+                  _navigateToGenre(mbtiToSave: _selectedMbti);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purpleAccent,
@@ -158,7 +160,7 @@ class _MbtiScreenState extends State<MbtiScreen> {
               TextButton(
                 onPressed: () {
                   // 건너뛰기는 MBTI를 저장하지 않고 인기 영화 추천으로 진입한다.
-                  _navigateToGenre(context);
+                  _navigateToGenre();
                 },
                 child: const Text(
                   '건너뛰기',
