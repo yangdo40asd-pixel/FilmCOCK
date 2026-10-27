@@ -3,6 +3,7 @@ import 'package:filmcock_app/data/services/api_service.dart';
 import 'package:filmcock_app/data/chatbot/chatbot_database.dart';
 import 'package:filmcock_app/data/services/movie_history_service.dart';
 import 'package:filmcock_app/data/models/chat_intent.dart';
+import 'package:filmcock_app/data/models/genre_catalog.dart';
 import 'package:filmcock_app/data/services/personalized_recommendation_service.dart';
 import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 
@@ -301,6 +302,10 @@ class ChatbotService {
       return _searchMovieTitle(match.searchTerm ?? '');
     }
 
+    if (intent == ChatIntent.genre && match.genreKey != null) {
+      return recommendGenre(match.genreKey!);
+    }
+
     return ChatMessage(
       text:
           '영화 추천과 영화 제목 검색, 배우·감독의 출연작 안내를 도와드릴 수 있어요. 예: “힐링 영화 추천”, “영화 기생충 찾아줘”, “봉준호 감독 작품”.',
@@ -386,10 +391,49 @@ class ChatbotService {
     );
   }
 
+  static const Map<String, String> _genreMessages = {
+    'animation': '세대를 가리지 않고 즐길 수 있는 애니메이션 작품들을 골라봤어요. 작화와 음악의 여운까지 함께 느껴보세요.',
+    'horror': '등골이 서늘해지는 공포 영화들입니다. 불을 끄고 보신다면 각오는 단단히 하세요.',
+    'crime': '긴장감 넘치는 수사와 범죄의 세계로 안내할 작품들입니다.',
+    'action': '화끈한 타격감과 속도감으로 몰입하게 만드는 액션 영화들입니다.',
+    'drama': '인물의 감정선을 따라가며 깊은 여운을 남기는 드라마 작품들입니다.',
+    'documentary': '실제 이야기의 힘을 느낄 수 있는 다큐멘터리 작품들입니다.',
+    'war': '전쟁의 참혹함과 그 속의 인간을 그린 작품들입니다.',
+    'music': '음악과 노래가 이야기를 이끄는 작품들입니다.',
+    'mystery': '마지막까지 단서를 쫓게 만드는 미스터리 작품들입니다.',
+    'adventure': '미지의 세계로 떠나는 모험 영화들입니다.',
+    'history': '역사와 실화를 바탕으로 한 묵직한 작품들입니다.',
+  };
+
+  static const Map<String, List<String>> _genreFallbackCategories = {
+    'animation': ['애니메이션', '힐링'],
+    'horror': ['스릴러', '심야'],
+    'crime': ['스릴러', '반전'],
+    'action': ['액션', '기분_액션'],
+    'drama': ['감동', '기분_드라마'],
+  };
+
+  /// GenreCatalog 키 기반 장르 추천. TMDB 장르 탐색 실패 시 큐레이션으로 대체한다.
+  Future<ChatMessage> recommendGenre(String genreKey) async {
+    await ChatbotDatabase.ensureLoaded();
+    final genreId = GenreCatalog.tmdbIdFor(genreKey);
+    final label = GenreCatalog.labelFor(genreKey) ?? genreKey;
+    if (genreId == null) {
+      return _localFallbackWithRetry('해당 장르를 아직 지원하지 않습니다.', '평점 높은 명작');
+    }
+    return _recommendFromGenre(
+      genreId: genreId,
+      fallbackCategories: _genreFallbackCategories[genreKey] ?? const ['명작'],
+      message: _genreMessages[genreKey] ?? '$label 장르의 인기작들입니다.',
+      genreLabel: label,
+    );
+  }
+
   Future<ChatMessage> _recommendFromGenre({
     required int genreId,
     required List<String> fallbackCategories,
     required String message,
+    String? genreLabel,
   }) async {
     try {
       final movies = _takeFreshMovies(
@@ -401,13 +445,21 @@ class ChatbotService {
           text: message,
           isUser: false,
           recommendedMovies: movies,
-          movieReasons: movies.map((_) => '선호 장르와 현재 인기도를 반영했습니다.').toList(),
+          movieReasons: movies
+              .map(
+                (movie) => genreLabel == null
+                    ? '선호 장르와 현재 인기도를 반영했습니다.'
+                    : '$genreLabel 인기작 · 평점 ${movie.voteAverage.toStringAsFixed(1)}',
+              )
+              .toList(),
         );
       }
     } catch (_) {}
     final fallback = _getCuratedByCategories(fallbackCategories);
     return ChatMessage(
-      text: message,
+      text: genreLabel == null
+          ? message
+          : '지금은 $genreLabel 목록을 불러오지 못해 앱에 준비된 추천작을 대신 보여드릴게요.',
       isUser: false,
       recommendedMovies: fallback.map((movie) => movie.toMovie()).toList(),
       movieReasons: fallback.map((movie) => movie.reason).toList(),

@@ -18,6 +18,7 @@ enum ChatIntent {
   highRated,
   personFilmography,
   movieTitle,
+  genre,
   unsupported,
 }
 
@@ -26,10 +27,14 @@ class ChatIntentMatch {
   final String normalizedInput;
   final String? searchTerm;
 
+  /// [ChatIntent.genre]일 때 GenreCatalog 키(예: animation, horror).
+  final String? genreKey;
+
   const ChatIntentMatch({
     required this.intent,
     required this.normalizedInput,
     this.searchTerm,
+    this.genreKey,
   });
 }
 
@@ -107,6 +112,17 @@ class ChatIntentResolver {
     };
 
     for (final rule in keywordRules.entries) {
+      // 상황·기분 규칙을 먼저 보고, 막연한 감정 처리 전에 장르를 판정한다.
+      if (rule.key == ChatIntent.moodVague) {
+        final genreKey = detectGenreKey(input);
+        if (genreKey != null) {
+          return ChatIntentMatch(
+            intent: ChatIntent.genre,
+            normalizedInput: input,
+            genreKey: genreKey,
+          );
+        }
+      }
       if (rule.value.any(input.contains)) {
         return ChatIntentMatch(intent: rule.key, normalizedInput: input);
       }
@@ -125,6 +141,30 @@ class ChatIntentResolver {
       intent: ChatIntent.unsupported,
       normalizedInput: input,
     );
+  }
+
+  /// GenreCatalog 키 -> 사용자 표현. 기존 상황 규칙에 없는 장르만 다룬다.
+  static const Map<String, List<String>> _genreKeywords = {
+    'animation': ['애니', '지브리', '픽사', '디즈니', '만화', '드림웍스'],
+    'horror': ['공포', '호러', '무서운', '귀신', '좀비', '오컬트'],
+    'crime': ['범죄', '느와르', '누아르', '형사'],
+    'action': ['액션', '격투', '총격'],
+    'drama': ['드라마'],
+    'documentary': ['다큐'],
+    'war': ['전쟁'],
+    'music': ['뮤지컬'],
+    'mystery': ['미스터리', '미스테리'],
+    'adventure': ['모험', '어드벤처'],
+    'history': ['사극', '역사', '실화'],
+  };
+
+  /// 입력에서 장르 키워드를 찾아 GenreCatalog 키를 반환한다.
+  static String? detectGenreKey(String input) {
+    final normalized = normalize(input);
+    for (final entry in _genreKeywords.entries) {
+      if (entry.value.any(normalized.contains)) return entry.key;
+    }
+    return null;
   }
 
   static String normalize(String value) {
