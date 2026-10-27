@@ -11,6 +11,7 @@ import 'package:filmcock_app/data/repositories/activity_repository.dart';
 import 'package:filmcock_app/data/repositories/user_settings_repository.dart';
 import 'package:filmcock_app/data/services/activity_change_service.dart';
 import 'package:filmcock_app/presentation/widgets/my_page_tier_section.dart';
+import 'package:filmcock_app/presentation/widgets/poster_image.dart';
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({super.key});
@@ -422,38 +423,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     ).then((_) => _loadUserData());
                   },
                   child: Container(
-                    width: 105,
+                    width: 90,
                     margin: const EdgeInsets.symmetric(horizontal: 6.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ClipRRect(
+                        PosterImage(
+                          imageUrl: fullPosterUrl,
+                          width: 90,
                           borderRadius: BorderRadius.circular(10.0),
-                          child: fullPosterUrl.isNotEmpty
-                              ? Image.network(
-                                  fullPosterUrl,
-                                  width: 105,
-                                  height: 135,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, stack) => Container(
-                                    width: 105,
-                                    height: 135,
-                                    color: Colors.grey[800],
-                                    child: const Icon(
-                                      Icons.movie,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  width: 105,
-                                  height: 135,
-                                  color: Colors.grey[800],
-                                  child: const Icon(
-                                    Icons.movie,
-                                    color: Colors.white54,
-                                  ),
-                                ),
                         ),
                         const SizedBox(height: 6),
                         Text(

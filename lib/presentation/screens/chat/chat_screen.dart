@@ -3,6 +3,10 @@ import 'package:filmcock_app/data/chatbot/chatbot_database.dart';
 import 'package:filmcock_app/data/services/chatbot_service.dart';
 import 'package:filmcock_app/presentation/screens/detail/movie_detail_screen.dart';
 import 'package:filmcock_app/presentation/widgets/app_loading_indicator.dart';
+import 'package:filmcock_app/presentation/widgets/poster_image.dart';
+
+/// 추천 카드 폭. 포스터는 PosterImage가 2:3 비율로 맞춘다.
+const double _chatPosterWidth = 120;
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -435,7 +439,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Padding(
               padding: const EdgeInsets.only(left: 46.0, top: 14.0),
               child: SizedBox(
-                height: 230,
+                height: 262,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: message.recommendedMovies!.length,
@@ -457,7 +461,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       },
                       child: Container(
-                        width: 140,
+                        width: _chatPosterWidth,
                         margin: const EdgeInsets.only(right: 12.0),
                         decoration: BoxDecoration(
                           color: isDark
@@ -481,32 +485,11 @@ class _ChatScreenState extends State<ChatScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // 영화 포스터
-                            ClipRRect(
+                            PosterImage(
+                              imageUrl: movie.fullPosterUrl,
+                              width: _chatPosterWidth,
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(12),
-                              ),
-                              child: SizedBox(
-                                width: 140,
-                                height: 140,
-                                child: movie.fullPosterUrl.isNotEmpty
-                                    ? Image.network(
-                                        movie.fullPosterUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => Container(
-                                          color: Colors.grey[800],
-                                          child: const Icon(
-                                            Icons.movie,
-                                            color: Colors.white54,
-                                          ),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: Colors.grey[800],
-                                        child: const Icon(
-                                          Icons.movie,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
                               ),
                             ),
                             Padding(
