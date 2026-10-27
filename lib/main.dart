@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:filmcock_app/firebase_options.dart';
 import 'package:filmcock_app/presentation/screens/splash/splash_screen.dart';
 import 'package:filmcock_app/core/theme/theme_controller.dart';
 import 'package:filmcock_app/data/services/home_prefetch_service.dart';
 import 'package:filmcock_app/core/config/secrets.dart';
+import 'package:filmcock_app/data/llm/llm_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +39,19 @@ class _MyAppState extends State<MyApp> {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+    }
+    if (LlmConfig.enabled) {
+      // LLM(Firebase AI Logic) 호출을 App Check로 보호한다. 실패해도 앱은 규칙 기반으로 동작한다.
+      try {
+        await FirebaseAppCheck.instance.activate(
+          providerAndroid: kDebugMode
+              ? const AndroidDebugProvider()
+              : const AndroidPlayIntegrityProvider(),
+          providerApple: kDebugMode
+              ? const AppleDebugProvider()
+              : const AppleDeviceCheckProvider(),
+        );
+      } catch (_) {}
     }
 
     final prefs = await SharedPreferences.getInstance();

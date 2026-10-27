@@ -1,3 +1,9 @@
+import 'dart:convert';
+
+import 'package:filmcock_app/data/llm/chat_plan.dart';
+import 'package:filmcock_app/data/llm/docent_prompt.dart';
+import 'package:filmcock_app/data/llm/firebase_llm_client.dart';
+import 'package:filmcock_app/data/llm/llm_client.dart';
 import 'package:filmcock_app/data/models/movie_model.dart';
 import 'package:filmcock_app/data/services/api_service.dart';
 import 'package:filmcock_app/data/chatbot/chatbot_database.dart';
@@ -33,15 +39,34 @@ class ChatbotService {
   ChatbotDialogueState _state = ChatbotDialogueState.initial;
   Set<int> _excludedMovieIds = const <int>{};
   final Set<int> _recentRecommendationIds = <int>{};
+  final LlmClient _llm;
+  final Future<List<Movie>> Function(String query) _movieSearch;
+  final List<LlmTurn> _history = <LlmTurn>[];
+
+  ChatbotService({
+    LlmClient? llmClient,
+    Future<List<Movie>> Function(String query)? movieSearch,
+  }) : _llm = llmClient ?? FirebaseLlmClient(),
+       _movieSearch = movieSearch ?? ApiService.searchMovies;
 
   ChatbotDialogueState get state => _state;
 
   void reset() {
     _state = ChatbotDialogueState.initial;
     _recentRecommendationIds.clear();
+    _history.clear();
   }
 
   Future<ChatMessage> processInput(String rawInput, {String? promptId}) async {
+    final response = await _processInternal(rawInput, promptId: promptId);
+    _recordTurn(rawInput, response);
+    return response;
+  }
+
+  Future<ChatMessage> _processInternal(
+    String rawInput, {
+    String? promptId,
+  }) async {
     await ChatbotDatabase.ensureLoaded();
     final match = ChatIntentResolver.resolve(rawInput, promptId: promptId);
     final input = match.normalizedInput;
@@ -54,6 +79,13 @@ class ChatbotService {
       if (promptId == null && ChatIntentResolver.isMoodFollowUp(input)) {
         return _handleMoodGenreFollowUp(input);
       }
+    }
+
+    // 자유 입력은 LLM 도슨트가 먼저 해석하고, 실패하면 아래 규칙 기반으로 대체한다.
+    // 프롬프트 칩(promptId)은 항상 규칙 기반으로 처리한다.
+    if (promptId == null && _llm.isAvailable) {
+      final llmResponse = await _tryLlm(rawInput.trim());
+      if (llmResponse != null) return llmResponse;
     }
 
     // 2. 초기 상태에서 기분/감정이 별로라는 폭넓은 질의 감지 -> 꼬리질문 트리거
@@ -312,6 +344,135 @@ class ChatbotService {
       isUser: false,
       followUpOptions: const ['힐링 영화', '박스오피스', 'MBTI 맞춤', '평점 높은 명작'],
     );
+  }
+
+  Set<String> get _curatedCategories => ChatbotDatabase.validCuratedMovies
+      .expand((movie) => movie.categories)
+      .toSet();
+
+  Future<ChatMessage?> _tryLlm(String input) async {
+    if (input.isEmpty) return null;
+    try {
+      final categories = _curatedCategories;
+      final raw = await _llm
+          .complete(
+            systemPrompt: DocentPrompt.build(
+              categories: categories,
+              mbti: await _settingsRepository.loadMbti(),
+            ),
+            history: List.unmodifiable(_history),
+            userInput: input,
+          )
+          .timeout(LlmConfig.timeout);
+      final plan = ChatPlan.tryParse(raw, allowedCategories: categories);
+      if (plan == null) return null;
+      return await _groundPlan(plan);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// LLM 계획을 실제 데이터(TMDB 검색·큐레이션)로 확인해 카드 응답을 만든다.
+  /// 확인되지 않은 영화는 보여주지 않는다.
+  Future<ChatMessage?> _groundPlan(ChatPlan plan) async {
+    switch (plan.intent) {
+      case ChatPlanIntent.outOfScope:
+        return ChatMessage(
+          text: plan.reply,
+          isUser: false,
+          followUpOptions: plan.followUps.isNotEmpty
+              ? plan.followUps
+              : const ['힐링 영화', '박스오피스', 'MBTI 맞춤', '평점 높은 명작'],
+        );
+      case ChatPlanIntent.searchTitle:
+        return _searchMovieTitle(plan.searchTerm!);
+      case ChatPlanIntent.person:
+        return _searchPersonFilmography(
+          plan.searchTerm!,
+          directing: plan.directing,
+        );
+      case ChatPlanIntent.recommend:
+        break;
+    }
+
+    final movies = <Movie>[];
+    final reasons = <String>[];
+    for (var i = 0; i < plan.candidateTitles.length; i++) {
+      final title = plan.candidateTitles[i];
+      List<Movie> results;
+      try {
+        results = await _movieSearch(title);
+      } catch (_) {
+        continue;
+      }
+      Movie? found;
+      for (final movie in results) {
+        if (_normalizeTitle(movie.title) == _normalizeTitle(title)) {
+          found = movie;
+          break;
+        }
+      }
+      if (found == null ||
+          _excludedMovieIds.contains(found.id) ||
+          _recentRecommendationIds.contains(found.id) ||
+          movies.any((movie) => movie.id == found!.id)) {
+        continue;
+      }
+      movies.add(found);
+      reasons.add(
+        i < plan.reasons.length
+            ? plan.reasons[i]
+            : '도슨트 추천 · 평점 ${found.voteAverage.toStringAsFixed(1)}',
+      );
+    }
+
+    final followUps = plan.followUps.isEmpty ? null : plan.followUps;
+    if (movies.isNotEmpty) {
+      _rememberMovieIds(movies.map((movie) => movie.id));
+      return ChatMessage(
+        text: plan.reply,
+        isUser: false,
+        recommendedMovies: movies,
+        movieReasons: reasons,
+        followUpOptions: followUps,
+      );
+    }
+    if (plan.genres.isNotEmpty) {
+      return recommendGenre(plan.genres.first);
+    }
+    if (plan.categories.isNotEmpty) {
+      final curated = _getCuratedByCategories(plan.categories);
+      return ChatMessage(
+        text: plan.reply,
+        isUser: false,
+        recommendedMovies: curated.map((movie) => movie.toMovie()).toList(),
+        movieReasons: curated.map((movie) => movie.reason).toList(),
+        followUpOptions: followUps,
+      );
+    }
+    return null;
+  }
+
+  static String _normalizeTitle(String value) =>
+      value.replaceAll(RegExp(r'[\s:·\-]'), '').toLowerCase();
+
+  void _recordTurn(String input, ChatMessage response) {
+    _history
+      ..add(LlmTurn(isUser: true, text: input.trim()))
+      ..add(
+        LlmTurn(
+          isUser: false,
+          text: jsonEncode({
+            'reply': response.text,
+            'candidateTitles': [
+              for (final movie in response.recommendedMovies ?? const <Movie>[])
+                movie.title,
+            ],
+          }),
+        ),
+      );
+    final overflow = _history.length - LlmConfig.maxHistoryTurns * 2;
+    if (overflow > 0) _history.removeRange(0, overflow);
   }
 
   Future<ChatMessage> _searchMovieTitle(String title) async {

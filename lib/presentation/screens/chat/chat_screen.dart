@@ -34,7 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _messages.add(
       ChatMessage(
         text:
-            '안녕하세요. 필름콕 영화 추천 도슨트입니다. 앱에 준비된 추천 규칙을 바탕으로 기분, 상황, 장르와 MBTI에 맞는 영화를 안내해 드립니다.',
+            '안녕하세요. 필름콕 영화 추천 도슨트입니다. 기분, 상황, 장르와 MBTI에 맞는 영화를 안내해 드립니다. 자유롭게 물어보셔도 좋아요.',
         isUser: false,
       ),
     );
