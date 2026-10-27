@@ -76,7 +76,6 @@ flutter:
     - assets/images/mbti/
     - assets/images/tier/
     - assets/data/chatbot_movies.json
-    - config/
 
 
   # An image asset can refer to one or more resolution-specific "variants", see

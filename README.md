@@ -11,16 +11,13 @@
 4. `config/api_keys.example.json`을 `config/api_keys.json`으로 복사하고 본인의
    TMDB·KOFIC 키를 입력합니다.
 
-실제 API 키는 소스 코드에 저장하지 않습니다. 로컬 키 파일은 앱 시작 시 자동으로
-읽으므로 평소에는 다음 명령만 사용합니다.
+실제 API 키는 소스 코드와 앱 에셋에 저장하지 않습니다. 키 파일은 Git에서 제외되며
+빌드 시 `--dart-define-from-file`로만 주입합니다.
 
 ```shell
-flutter run
+flutter run --dart-define-from-file=config/api_keys.json
+flutter build apk --dart-define-from-file=config/api_keys.json
 ```
-
-CI처럼 로컬 파일을 사용하지 않는 환경에서는
-`--dart-define-from-file=config/api_keys.json`으로 값을 주입할 수 있으며 이 값이
-로컬 파일보다 우선합니다.
 
 `config/api_keys.json`의 빈 값에는 재발급한 실제 키를 입력해야 합니다. 키가 없으면
 외부 영화 API 요청은 즉시 실패하며 화면에서 설정 누락 원인과 재시도 상태를
