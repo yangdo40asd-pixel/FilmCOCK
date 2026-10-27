@@ -160,19 +160,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF222222),
-        title: const Text(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+        title: Text(
           '로그아웃',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        content: const Text(
+        content: Text(
           '로그아웃 하시겠습니까?',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              '취소',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -211,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF222222),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
         title: const Text(
           '회원탈퇴',
           style: TextStyle(
@@ -219,14 +229,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
+        content: Text(
           '회원 탈퇴 시 모든 활동 데이터와 등급이 영구히 삭제됩니다.\n계속 진행하시겠습니까?',
-          style: TextStyle(color: Colors.white70, height: 1.4),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+            child: Text(
+              '취소',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
@@ -249,8 +267,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF141414),
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
         ),
@@ -258,19 +276,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           tooltip: '뒤로 가기',
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           '환경 설정',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -288,7 +309,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(
               '활동 알림',
               style: TextStyle(
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -297,13 +318,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SwitchListTile(
             value: _allPushEnabled,
             activeThumbColor: const Color(0xFF8B5CF6),
-            title: const Text(
+            title: Text(
               '앱 내 알림 안내',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 15,
+              ),
             ),
             subtitle: Text(
               '홈 화면에서 제공하는 알림 안내를 표시합니다.',
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             onChanged: (val) {
               setState(() => _allPushEnabled = val);
@@ -313,13 +340,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SwitchListTile(
             value: _upcomingAlarmEnabled,
             activeThumbColor: const Color(0xFF8B5CF6),
-            title: const Text(
+            title: Text(
               '곧 개봉할 영화 알림',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 15,
+              ),
             ),
             subtitle: Text(
               '홈 화면 진입 시 개봉 예정작 팝업 안내를 받습니다.',
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             onChanged: (val) {
               setState(() => _upcomingAlarmEnabled = val);
@@ -327,7 +360,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           const SizedBox(height: 16),
-          const Divider(color: Colors.white12, height: 1),
+          Divider(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            height: 1,
+          ),
           const SizedBox(height: 16),
 
           // Section 2: 계정 관리
@@ -339,7 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(
               '계정 관리',
               style: TextStyle(
-                color: Colors.grey[400],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -347,9 +383,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 20.0),
-            title: const Text(
+            title: Text(
               '로그아웃',
-              style: TextStyle(color: Colors.white, fontSize: 15),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 15,
+              ),
             ),
             onTap: _showLogoutDialog,
           ),

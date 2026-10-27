@@ -82,18 +82,24 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           tooltip: '뒤로 가기',
           onPressed: () => Navigator.pop(context, true),
         ),
         title: TextField(
           controller: _searchController,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 16,
+          ),
           onChanged: (val) {
             if (val.isEmpty) {
               _loadPopularMovies();
@@ -102,7 +108,10 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
           onSubmitted: _search,
           decoration: InputDecoration(
             hintText: '작품 제목을 검색해보세요',
-            hintStyle: TextStyle(color: Colors.grey[500], fontSize: 15),
+            hintStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 15,
+            ),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 10),
           ),
@@ -111,7 +120,7 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
           IconButton(
             icon: Icon(
               _searchController.text.isNotEmpty ? Icons.close : Icons.search,
-              color: Colors.white70,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             tooltip: _searchController.text.isNotEmpty ? '검색어 지우기' : '영화 검색',
             onPressed: () {
@@ -135,8 +144,8 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
             ),
             child: Text(
               _isSearching ? '검색 결과' : '인기 작품',
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -151,7 +160,10 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
                 ? Center(
                     child: Text(
                       _isSearching ? '검색된 작품이 없습니다.' : '인기 작품을 불러올 수 없습니다.',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 15),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 15,
+                      ),
                     ),
                   )
                 : GridView.builder(
@@ -191,18 +203,26 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
                                         fit: BoxFit.cover,
                                         errorBuilder: (ctx, err, stack) =>
                                             Container(
-                                              color: Colors.grey[850],
-                                              child: const Icon(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                              child: Icon(
                                                 Icons.movie,
-                                                color: Colors.white54,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                               ),
                                             ),
                                       )
                                     : Container(
-                                        color: Colors.grey[850],
-                                        child: const Icon(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerHighest,
+                                        child: Icon(
                                           Icons.movie,
-                                          color: Colors.white54,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                         ),
                                       ),
                               ),
@@ -210,8 +230,8 @@ class _CalendarAddMovieScreenState extends State<CalendarAddMovieScreen> {
                             const SizedBox(height: 6),
                             Text(
                               movie.title,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),

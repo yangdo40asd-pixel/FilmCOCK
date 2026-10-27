@@ -62,9 +62,9 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         title: const Text('내가 쓴 댓글'),
       ),
@@ -73,10 +73,13 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
               child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
             )
           : _comments.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 '작성한 댓글이 없습니다.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             )
           : ListView.separated(
@@ -124,7 +127,9 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(14.0),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E22),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -141,20 +146,28 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
                                     errorBuilder: (c, e, s) => Container(
                                       width: 50,
                                       height: 70,
-                                      color: Colors.grey[800],
-                                      child: const Icon(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
+                                      child: Icon(
                                         Icons.movie,
-                                        color: Colors.white54,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   )
                                 : Container(
                                     width: 50,
                                     height: 70,
-                                    color: Colors.grey[800],
-                                    child: const Icon(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                                    child: Icon(
                                       Icons.movie,
-                                      color: Colors.white54,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                           ),
@@ -170,8 +183,10 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
                                     Expanded(
                                       child: Text(
                                         movieTitle,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                           fontSize: 15,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -183,7 +198,9 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
                                       Text(
                                         date,
                                         style: TextStyle(
-                                          color: Colors.grey[500],
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
                                           fontSize: 11,
                                         ),
                                       ),
@@ -193,7 +210,10 @@ class _MyCommentsScreenState extends State<MyCommentsScreen> {
                                 Text(
                                   content,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.85),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.85),
                                     fontSize: 13,
                                     height: 1.4,
                                   ),

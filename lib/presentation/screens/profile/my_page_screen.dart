@@ -109,21 +109,25 @@ class _MyPageScreenState extends State<MyPageScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF282830),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18.0),
         ),
-        title: const Text(
+        title: Text(
           '캘린더 이용 안내',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
+        content: Text(
           '봤어요! 버튼을 눌러 작품을 추가해보세요.',
-          style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 14,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
@@ -151,8 +155,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF141414),
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
         ),
@@ -160,21 +164,24 @@ class _MyPageScreenState extends State<MyPageScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
-        title: const Text(
+        title: Text(
           '마이페이지',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            icon: Icon(
+              Icons.settings_outlined,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             tooltip: '설정 열기',
             onPressed: () {
               Navigator.push(
@@ -188,7 +195,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
       body: RefreshIndicator(
         onRefresh: _loadUserData,
         color: const Color(0xFFA88BFA),
-        backgroundColor: const Color(0xFF222222),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(bottom: 40.0),
@@ -234,7 +241,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E22),
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16.0),
       ),
       child: Row(
@@ -273,8 +280,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
               children: [
                 Text(
                   _nickname,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
@@ -282,7 +289,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 const SizedBox(height: 4),
                 Text(
                   _bio,
-                  style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 13,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -293,7 +303,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
           // Edit Profile Button
           OutlinedButton(
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white24),
+              side: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -308,9 +320,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 _loadUserData();
               }
             },
-            child: const Text(
+            child: Text(
               '프로필 수정',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -367,12 +382,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.0),
           child: Text(
             '🍿 내가 추천한 띵작!',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 17,
               fontWeight: FontWeight.bold,
             ),
@@ -387,7 +402,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
             ),
             child: Text(
               '영화 상세에서 "좋아요(하트)"를 누르면 여기에 추천 띵작으로 등록됩니다.',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
           )
         else
@@ -436,8 +454,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                         const SizedBox(height: 6),
                         Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -460,12 +478,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.0),
           child: Text(
             '💖 좋아요한 인물',
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 17,
               fontWeight: FontWeight.bold,
             ),
@@ -480,7 +498,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
             ),
             child: Text(
               '좋아하는 배우나 감독의 상세 페이지에서 하트를 눌러보세요!',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
           )
         else
@@ -541,19 +562,26 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       children: [
                         CircleAvatar(
                           radius: 32,
-                          backgroundColor: const Color(0xFF2C2C2E),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
                           backgroundImage: fullProfileUrl.isNotEmpty
                               ? NetworkImage(fullProfileUrl)
                               : null,
                           child: fullProfileUrl.isEmpty
-                              ? const Icon(Icons.person, color: Colors.white70)
+                              ? Icon(
+                                  Icons.person,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                )
                               : null,
                         ),
                         const SizedBox(height: 6),
                         Text(
                           name,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -582,10 +610,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '📝 내가 쓴 댓글',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                 ),
@@ -610,7 +638,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
             ),
             child: Text(
               '아직 작성한 댓글이 없습니다. 영화 상세화면에서 댓글을 남겨보세요!',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
           )
         else
@@ -651,7 +682,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                   margin: const EdgeInsets.only(bottom: 12.0),
                   padding: const EdgeInsets.all(14.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E22),
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(14.0),
                   ),
                   child: Row(
@@ -668,10 +699,14 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 errorBuilder: (ctx, err, stack) => Container(
                                   width: 52,
                                   height: 74,
-                                  color: Colors.grey[800],
-                                  child: const Icon(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  child: Icon(
                                     Icons.movie,
-                                    color: Colors.white54,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                     size: 28,
                                   ),
                                 ),
@@ -679,10 +714,14 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             : Container(
                                 width: 52,
                                 height: 74,
-                                color: Colors.grey[800],
-                                child: const Icon(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                child: Icon(
                                   Icons.movie,
-                                  color: Colors.white54,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                   size: 28,
                                 ),
                               ),
@@ -698,8 +737,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 Expanded(
                                   child: Text(
                                     movieTitle,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -711,7 +752,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                   Text(
                                     date,
                                     style: TextStyle(
-                                      color: Colors.grey[500],
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                       fontSize: 11,
                                     ),
                                   ),
@@ -721,7 +764,9 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             Text(
                               content,
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.88),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.88),
                                 fontSize: 13,
                                 height: 1.4,
                               ),

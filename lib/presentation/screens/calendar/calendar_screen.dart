@@ -87,7 +87,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   void _showDayMoviesSheet(int day, List<Map<String, dynamic>> movies) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF222226),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -103,14 +103,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 children: [
                   Text(
                     '📅 $_selectedYear년 $_selectedMonth월 $day일에 본 작품',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
+                    icon: Icon(
+                      Icons.close,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                     tooltip: '닫기',
                     onPressed: () => Navigator.pop(ctx),
                   ),
@@ -126,7 +129,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   margin: const EdgeInsets.only(bottom: 10.0),
                   padding: const EdgeInsets.all(10.0),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2E2E34),
+                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -142,20 +145,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 errorBuilder: (c, e, s) => Container(
                                   width: 44,
                                   height: 60,
-                                  color: Colors.grey[800],
-                                  child: const Icon(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  child: Icon(
                                     Icons.movie,
-                                    color: Colors.white54,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               )
                             : Container(
                                 width: 44,
                                 height: 60,
-                                color: Colors.grey[800],
-                                child: const Icon(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                child: Icon(
                                   Icons.movie,
-                                  color: Colors.white54,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                       ),
@@ -163,8 +174,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
@@ -211,8 +222,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF141414),
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
         ),
@@ -235,29 +246,40 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           tooltip: '뒤로 가기',
           onPressed: () => Navigator.pop(context),
         ),
         title: DropdownButtonHideUnderline(
           child: DropdownButton<int>(
             value: _selectedYear,
-            dropdownColor: const Color(0xFF222226),
-            icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-            style: const TextStyle(
-              color: Colors.white,
+            dropdownColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+            icon: Icon(
+              Icons.arrow_drop_down,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.bold,
             ),
             items: availableYears.map((y) {
               return DropdownMenuItem<int>(
                 value: y,
-                child: Text('$y년', style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  '$y년',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
               );
             }).toList(),
             onChanged: (val) {
@@ -307,13 +329,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       color: isFutureMonth
                           ? Colors.transparent
                           : (isSelected
-                                ? const Color(0xFF282832)
+                                ? Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHigh
                                 : Colors.transparent),
                       borderRadius: BorderRadius.circular(20.0),
                       border: Border.all(
                         color: isFutureMonth
-                            ? Colors.white10
-                            : (isSelected ? Colors.white : Colors.white24),
+                            ? Theme.of(context).colorScheme.outlineVariant
+                            : (isSelected
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.outlineVariant),
                         width: 1.2,
                       ),
                     ),
@@ -322,8 +350,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       '$month월',
                       style: TextStyle(
                         color: isFutureMonth
-                            ? Colors.white24
-                            : (isSelected ? Colors.white : Colors.grey[500]),
+                            ? Theme.of(context).colorScheme.outlineVariant
+                            : (isSelected
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant),
                         fontSize: 14,
                         fontWeight: isSelected
                             ? FontWeight.bold
@@ -345,7 +377,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: Container(
                 padding: const EdgeInsets.all(18.0),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E24),
+                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(18.0),
                 ),
                 child: Column(
@@ -354,10 +386,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           '본 작품 캘린더',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -365,7 +397,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         Text(
                           '$_selectedYear년 ${_selectedMonth.toString().padLeft(2, '0')}월',
                           style: TextStyle(
-                            color: Colors.grey[300],
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 14,
                           ),
                         ),
@@ -421,7 +455,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           child: Container(
                             decoration: BoxDecoration(
                               color: (!isFutureDay && movies.isNotEmpty)
-                                  ? const Color(0xFF26262E)
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHigh
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -446,12 +482,20 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     '$day',
                                     style: TextStyle(
                                       color: isFutureDay
-                                          ? Colors.white24
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.outlineVariant
                                           : (isToday
-                                                ? Colors.white
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.onSurface
                                                 : (day > 30
-                                                      ? Colors.grey[700]
-                                                      : Colors.white70)),
+                                                      ? Theme.of(
+                                                          context,
+                                                        ).colorScheme.outline
+                                                      : Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant)),
                                       fontSize: 15,
                                       fontWeight: isToday
                                           ? FontWeight.bold

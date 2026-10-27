@@ -142,8 +142,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF141414),
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFFA88BFA)),
         ),
@@ -151,19 +151,22 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
           tooltip: '뒤로 가기',
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           '프로필 수정',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
@@ -251,17 +254,22 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     '닉네임',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _nicknameController,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 15,
+                    ),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: const Color(0xFF2C2C2E),
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHigh,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 14,
@@ -283,7 +291,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     '자기 소개',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[400],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -291,10 +299,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   TextFormField(
                     controller: _bioController,
                     maxLines: 4,
-                    style: const TextStyle(color: Colors.white, fontSize: 15),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 15,
+                    ),
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: const Color(0xFF2C2C2E),
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHigh,
                       contentPadding: const EdgeInsets.all(16),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
