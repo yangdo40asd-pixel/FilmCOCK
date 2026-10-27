@@ -27,7 +27,6 @@ class FirebaseLlmClient implements LlmClient {
           responseMimeType: 'application/json',
           temperature: 0.6,
           maxOutputTokens: 2048,
-          thinkingConfig: ThinkingConfig.withThinkingBudget(0),
         ),
       );
       _modelPrompt = systemPrompt;

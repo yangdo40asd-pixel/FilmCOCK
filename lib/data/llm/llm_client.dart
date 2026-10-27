@@ -29,7 +29,7 @@ class LlmConfig {
 
   static const String model = String.fromEnvironment(
     'LLM_MODEL',
-    defaultValue: 'gemini-2.5-flash',
+    defaultValue: 'gemini-3.5-flash-lite',
   );
   static const Duration timeout = Duration(seconds: 15);
   static const int maxHistoryTurns = 6;
