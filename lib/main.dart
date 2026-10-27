@@ -40,8 +40,8 @@ class _MyAppState extends State<MyApp> {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
-    if (LlmConfig.enabled) {
-      // LLM(Firebase AI Logic) 호출을 App Check로 보호한다. 실패해도 앱은 규칙 기반으로 동작한다.
+    if (LlmConfig.enabled && LlmConfig.appCheckEnabled) {
+      // App Check는 기본 꺼짐이다. Firebase 콘솔에서 앱을 등록·적용한 뒤 --dart-define=ENABLE_APP_CHECK=true로 켠다.
       try {
         await FirebaseAppCheck.instance.activate(
           providerAndroid: kDebugMode

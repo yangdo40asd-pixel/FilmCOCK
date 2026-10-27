@@ -26,6 +26,9 @@ class LlmConfig {
     'ENABLE_LLM_CHAT',
     defaultValue: true,
   );
+
+  /// Firebase App Check 사용 여부. 콘솔에 앱을 등록하지 않았다면 켜지 않는다(켜면 403 발생).
+  static const bool appCheckEnabled = bool.fromEnvironment('ENABLE_APP_CHECK');
   static const String model = String.fromEnvironment(
     'LLM_MODEL',
     defaultValue: 'gemini-2.5-flash',

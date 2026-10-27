@@ -69,7 +69,7 @@ Android 실기기 설치, 로그인 방식별 재인증·회원탈퇴, 검색, �
   해석합니다. LLM이 제안한 영화는 TMDB 검색으로 확인된 것만 표시하며, LLM이 꺼져 있거나
   실패하면 규칙 기반으로 자동 대체됩니다. 사용하려면 Firebase 콘솔에서 AI Logic(Gemini
   Developer API)과 App Check를 설정하세요. LLM은 기본으로 켜져 있으며 `--dart-define=ENABLE_LLM_CHAT=false`로
-  끌 수 있습니다(App Check 적용을 켠 경우 디버그 빌드는 디버그 토큰 등록 필요).
+  끌 수 있습니다. App Check는 기본 꺼짐이며, 콘솔에 앱을 등록한 뒤 `--dart-define=ENABLE_APP_CHECK=true`로 켭니다.
 - 홈 캐시는 메모리 기반이며 앱을 완전히 종료하면 초기화됩니다.
 - 과거 Git 이력에 포함된 API 키는 코드 변경만으로 폐기되지 않습니다. 각 제공자
   콘솔에서 기존 키를 폐기하고 새 키의 사용 범위와 쿼터를 제한해야 합니다.
