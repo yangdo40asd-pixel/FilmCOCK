@@ -11,12 +11,12 @@
 4. `config/api_keys.example.json`을 `config/api_keys.json`으로 복사하고 본인의
    TMDB·KOFIC 키를 입력합니다.
 
-실제 API 키는 소스 코드와 앱 에셋에 저장하지 않습니다. 키 파일은 Git에서 제외되며
-빌드 시 `--dart-define-from-file`로만 주입합니다.
+실제 API 키 파일(`config/api_keys.json`)은 Git에서 제외되며 앱 에셋으로 포함되어 별도 옵션 없이
+`flutter run`만으로 읽힙니다(`--dart-define-from-file`로 주입하는 방식도 계속 지원).
 
 ```shell
-flutter run --dart-define-from-file=config/api_keys.json
-flutter build apk --dart-define-from-file=config/api_keys.json
+flutter run
+flutter build apk
 ```
 
 `config/api_keys.json`의 빈 값에는 재발급한 실제 키를 입력해야 합니다. 키가 없으면
@@ -68,8 +68,8 @@ Android 실기기 설치, 로그인 방식별 재인증·회원탈퇴, 검색, �
 - 챗봇 질문 칩은 앱 내부 규칙으로, 자유 입력은 Firebase AI Logic(Gemini Flash)으로
   해석합니다. LLM이 제안한 영화는 TMDB 검색으로 확인된 것만 표시하며, LLM이 꺼져 있거나
   실패하면 규칙 기반으로 자동 대체됩니다. 사용하려면 Firebase 콘솔에서 AI Logic(Gemini
-  Developer API)과 App Check를 설정한 뒤 `--dart-define=ENABLE_LLM_CHAT=true`를 함께
-  지정합니다(디버그 빌드는 App Check 디버그 토큰 등록 필요).
+  Developer API)과 App Check를 설정하세요. LLM은 기본으로 켜져 있으며 `--dart-define=ENABLE_LLM_CHAT=false`로
+  끌 수 있습니다(App Check 적용을 켠 경우 디버그 빌드는 디버그 토큰 등록 필요).
 - 홈 캐시는 메모리 기반이며 앱을 완전히 종료하면 초기화됩니다.
 - 과거 Git 이력에 포함된 API 키는 코드 변경만으로 폐기되지 않습니다. 각 제공자
   콘솔에서 기존 키를 폐기하고 새 키의 사용 범위와 쿼터를 제한해야 합니다.

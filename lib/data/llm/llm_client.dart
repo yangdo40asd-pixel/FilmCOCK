@@ -18,11 +18,14 @@ abstract class LlmClient {
   });
 }
 
-/// 빌드 시 `--dart-define=ENABLE_LLM_CHAT=true`로 켠다. 기본값은 꺼짐(규칙 기반).
+/// LLM 챗봇 사용 여부. 기본값은 켜짐이며 `--dart-define=ENABLE_LLM_CHAT=false`로 끈다(규칙 기반).
 class LlmConfig {
   LlmConfig._();
 
-  static const bool enabled = bool.fromEnvironment('ENABLE_LLM_CHAT');
+  static const bool enabled = bool.fromEnvironment(
+    'ENABLE_LLM_CHAT',
+    defaultValue: true,
+  );
   static const String model = String.fromEnvironment(
     'LLM_MODEL',
     defaultValue: 'gemini-2.5-flash',
