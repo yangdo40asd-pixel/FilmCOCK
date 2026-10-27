@@ -1,5 +1,6 @@
 import 'package:filmcock_app/data/storage/app_storage_keys.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationSettings {
@@ -44,7 +45,10 @@ class UserSettingsRepository {
   const UserSettingsRepository();
 
   Future<String> _preferenceOwner(SharedPreferences prefs) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    // Firebase 초기화 전(테스트 등)에는 로그인 사용자가 없는 것으로 처리한다.
+    final uid = Firebase.apps.isEmpty
+        ? null
+        : FirebaseAuth.instance.currentUser?.uid;
     if (uid != null && uid.isNotEmpty) return 'user_$uid';
 
     final guestId = prefs.getString(AppStorageKeys.guestSessionId);

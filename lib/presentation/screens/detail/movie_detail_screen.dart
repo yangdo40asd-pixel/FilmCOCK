@@ -126,21 +126,22 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
-                backgroundColor: const Color(0xFF222226),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
                 title: const Text(
                   '캘린더에 추가되었습니다.',
                   style: TextStyle(
-                    color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
                   ),
                 ),
                 content: Text(
                   '\'${widget.movie.title}\'이(가) 오늘 캘린더에 성공적으로 등록되었습니다.',
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
                 ),
                 actions: [
                   TextButton(
@@ -230,7 +231,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF222222),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -252,7 +252,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                   const Text(
                     '댓글 작성',
                     style: TextStyle(
-                      color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -267,18 +266,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
               const SizedBox(height: 4),
               Text(
                 widget.movie.title,
-                style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                style: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: commentController,
                 maxLines: 4,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
+                style: const TextStyle(fontSize: 15),
                 decoration: InputDecoration(
                   hintText: '이 영화에 대한 감상평을 솔직하게 남겨보세요!',
                   hintStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
                   filled: true,
-                  fillColor: const Color(0xFF2E2E30),
+                  fillColor: Theme.of(ctx).colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -383,7 +385,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,7 +425,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
+              colors: [
+                Colors.transparent,
+                Theme.of(context).colorScheme.surface,
+              ],
             ),
           ),
         ),
@@ -473,7 +477,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
             ),
           ),
         ),
@@ -528,8 +531,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               person.displayName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                                 fontSize: 13,
                               ),
                             ),
@@ -558,7 +563,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
             ),
           ),
         ),
@@ -612,8 +616,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> {
                               movie.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white70,
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
                             ),
