@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:filmcock_app/firebase_options.dart';
 import 'package:filmcock_app/presentation/screens/splash/splash_screen.dart';
 import 'package:filmcock_app/core/theme/theme_controller.dart';
 import 'package:filmcock_app/data/services/home_prefetch_service.dart';
 import 'package:filmcock_app/core/config/secrets.dart';
-import 'package:filmcock_app/data/llm/llm_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,19 +36,6 @@ class _MyAppState extends State<MyApp> {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-    }
-    if (LlmConfig.enabled && LlmConfig.appCheckEnabled) {
-      // App Check는 기본 꺼짐이다. Firebase 콘솔에서 앱을 등록·적용한 뒤 --dart-define=ENABLE_APP_CHECK=true로 켠다.
-      try {
-        await FirebaseAppCheck.instance.activate(
-          providerAndroid: kDebugMode
-              ? const AndroidDebugProvider()
-              : const AndroidPlayIntegrityProvider(),
-          providerApple: kDebugMode
-              ? const AppleDebugProvider()
-              : const AppleDeviceCheckProvider(),
-        );
-      } catch (_) {}
     }
 
     final prefs = await SharedPreferences.getInstance();

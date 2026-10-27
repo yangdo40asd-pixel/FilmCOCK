@@ -579,7 +579,7 @@
 - [x] 챗봇 장르 의도(액션·공포 등) 판정 추가
 - [x] 자유 입력 LLM(Firebase AI Logic) 연동, TMDB 검증·규칙 기반 대체, 최근 6턴 기록
 - [x] `config/` 에셋 번들은 기존 방식 유지(별도 옵션 없이 `flutter run`). 배포 전 키 주입 방식 재검토 필요
-- [ ] Firebase 콘솔 AI Logic·App Check 설정 및 실기기 LLM 응답 확인 — 사용자 실행
+- [ ] Firebase 콘솔 AI Logic 설정 및 실기기 LLM 응답 확인(App Check는 미사용, 배포 전 재검토) — 사용자 실행
 - [ ] 과거 이력에 노출된 API 키 폐기·재발급 — 사용자 실행
 
 ---
