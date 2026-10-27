@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import 'package:filmcock_app/data/llm/chat_plan.dart';
@@ -365,9 +366,14 @@ class ChatbotService {
           )
           .timeout(LlmConfig.timeout);
       final plan = ChatPlan.tryParse(raw, allowedCategories: categories);
-      if (plan == null) return null;
+      if (plan == null) {
+        debugPrint('[LLM] 응답을 해석하지 못해 규칙 기반으로 대체: $raw');
+        return null;
+      }
+      debugPrint('[LLM] 성공: intent=${plan.intent}');
       return await _groundPlan(plan);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[LLM] 실패해 규칙 기반으로 대체: $e');
       return null;
     }
   }
