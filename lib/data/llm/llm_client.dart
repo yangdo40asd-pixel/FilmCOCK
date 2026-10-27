@@ -33,6 +33,6 @@ class LlmConfig {
     'LLM_MODEL',
     defaultValue: 'gemini-2.5-flash',
   );
-  static const Duration timeout = Duration(seconds: 8);
+  static const Duration timeout = Duration(seconds: 15);
   static const int maxHistoryTurns = 6;
 }
