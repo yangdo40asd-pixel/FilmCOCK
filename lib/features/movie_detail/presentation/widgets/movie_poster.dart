@@ -1,0 +1,35 @@
+// 1. 방금 만든 상세 화면 파일을 import
+import 'package:filmcock_app/features/movie_detail/presentation/screens/movie_detail_screen.dart';
+import 'package:filmcock_app/shared/domain/models/catalog_models.dart';
+import 'package:flutter/material.dart';
+import 'package:filmcock_app/shared/presentation/widgets/app_network_image.dart';
+
+class MoviePoster extends StatelessWidget {
+  final Movie movie;
+
+  const MoviePoster({super.key, required this.movie});
+
+  @override
+  Widget build(BuildContext context) {
+    // 2. GestureDetector 위젯으로 Card를 감싸서 탭을 감지
+    return GestureDetector(
+      onTap: () {
+        // 3. 탭하면 MovieDetailScreen으로 이동
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => MovieDetailScreen(movie: movie),
+          ),
+        );
+      },
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Container(
+          width: 130,
+          height: 190,
+          color: Colors.grey[800],
+          child: AppNetworkImage(imageUrl: movie.fullPosterUrl),
+        ),
+      ),
+    );
+  }
+}

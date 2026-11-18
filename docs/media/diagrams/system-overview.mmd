@@ -1,0 +1,11 @@
+flowchart TD
+    Main[main] --> App[App and bootstrap]
+    App --> Session[Session and onboarding]
+    Session --> Screens[Feature screens]
+    Screens --> State[Controllers and application policies]
+    State --> Ports[Catalog and preference contracts]
+    Ports --> Remote[TMDB KOFIC Firebase adapters]
+    Ports --> Local[Local storage and cache]
+    State --> Chat[Rules and LLM interpretation]
+    Chat --> Verify[Candidate verification]
+    Verify --> Ports

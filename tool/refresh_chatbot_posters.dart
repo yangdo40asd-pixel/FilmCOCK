@@ -32,7 +32,12 @@ Future<void> main(List<String> args) async {
   for (final entry in entries) {
     final id = entry['id'];
     final title = '${entry['title']}';
-    var detail = await _get(client, '/3/movie/$id?language=ko-KR', token, apiKey);
+    var detail = await _get(
+      client,
+      '/3/movie/$id?language=ko-KR',
+      token,
+      apiKey,
+    );
     if (detail != null && !_titleMatches(title, detail)) {
       // id가 다른 영화를 가리키는 경우: 제목+개봉연도로 검색해 유일하게 일치할 때만 교정.
       final fixed = await _searchExact(client, entry, token, apiKey);
@@ -131,7 +136,9 @@ Future<Map<String, dynamic>?> _get(
 ) async {
   var uri = Uri.parse('https://api.themoviedb.org$path');
   if (token.isEmpty) {
-    uri = uri.replace(queryParameters: {...uri.queryParameters, 'api_key': apiKey});
+    uri = uri.replace(
+      queryParameters: {...uri.queryParameters, 'api_key': apiKey},
+    );
   }
   try {
     final request = await client.getUrl(uri);

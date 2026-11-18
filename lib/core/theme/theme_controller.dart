@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:filmcock_app/data/storage/app_storage_keys.dart';
+import 'package:filmcock_app/core/storage/app_storage_keys.dart';
 
 class ThemeController {
   static final ValueNotifier<ThemeMode> themeMode = ValueNotifier(

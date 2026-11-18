@@ -1,0 +1,13 @@
+import 'package:filmcock_app/shared/data/reference/generated/korean_people_data.g.dart';
+import 'package:filmcock_app/shared/domain/models/catalog_models.dart';
+
+/// 생성된 대용량 인물 데이터에 대한 안정적인 공개 진입점입니다.
+class KoreanPeopleData {
+  const KoreanPeopleData._();
+
+  static List<Person> get masterActors =>
+      KoreanPeopleDataGenerated.masterActors;
+
+  static List<Person> get masterDirectors =>
+      KoreanPeopleDataGenerated.masterDirectors;
+}
